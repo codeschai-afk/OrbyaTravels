@@ -5,9 +5,15 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import { z } from 'zod'
 import { Globe, Eye, EyeOff, Loader2 } from 'lucide-react'
+
+const ROLE_URLS: Record<string, string> = {
+  PROVIDER: `${process.env.NEXT_PUBLIC_PROVIDER_URL ?? 'http://localhost:3001'}/listings`,
+  EMPLOYEE: `${process.env.NEXT_PUBLIC_STAFF_URL ?? 'http://localhost:3002'}/queue`,
+  ADMIN:    `${process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3003'}/`,
+}
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -40,12 +46,21 @@ export default function SignInPage() {
       setError('Invalid email or password')
       return
     }
-    router.push('/dashboard')
+
+    const session = await getSession()
+    const role = session?.user?.role ?? 'CUSTOMER'
+    const dest = ROLE_URLS[role]
+
+    if (dest) {
+      window.location.href = dest   // cross-subdomain — full navigation
+    } else {
+      router.push('/trips')
+    }
   }
 
   const handleGoogle = async () => {
     setGoogleLoading(true)
-    await signIn('google', { callbackUrl: '/dashboard' })
+    await signIn('google', { callbackUrl: '/trips' })
   }
 
   return (

@@ -230,6 +230,7 @@ model Listing {
   provider_id      String
   country_id       String
   type             ListingType
+  slug             String
   title            String
   description      String         @db.Text
   base_price       Decimal        @db.Decimal(12, 2)
@@ -253,6 +254,7 @@ model Listing {
   reviews           Review[]
   transport_schedules TransportSchedule[]
 
+  @@unique([slug, type])
   @@index([country_id])
   @@index([type])
   @@index([approval_status])
