@@ -1,0 +1,73 @@
+version: '3.9'
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - '3000:3000'
+    env_file: ../.env.local
+    depends_on:
+      - api
+
+  provider:
+    build:
+      context: ..
+      dockerfile: docker/provider.Dockerfile
+    ports:
+      - '3001:3001'
+    env_file: ../.env.local
+    depends_on:
+      - api
+
+  employee:
+    build:
+      context: ..
+      dockerfile: docker/employee.Dockerfile
+    ports:
+      - '3002:3002'
+    env_file: ../.env.local
+    depends_on:
+      - api
+
+  admin:
+    build:
+      context: ..
+      dockerfile: docker/admin.Dockerfile
+    ports:
+      - '3003:3003'
+    env_file: ../.env.local
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    ports:
+      - '4000:4000'
+    env_file: ../.env.local
+    depends_on:
+      - redis
+      - meilisearch
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.9
+    ports:
+      - '7700:7700'
+    environment:
+      - MEILI_MASTER_KEY=${MEILISEARCH_API_KEY}
+    volumes:
+      - meilisearch_data:/meili_data
+
+volumes:
+  redis_data:
+  meilisearch_data:

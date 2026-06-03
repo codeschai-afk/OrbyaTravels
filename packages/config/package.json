@@ -1,0 +1,17 @@
+{
+  "name": "@orbyatravel/config",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./typescript": "./typescript/base.json",
+    "./typescript/nextjs": "./typescript/nextjs.json",
+    "./typescript/node": "./typescript/node.json",
+    "./eslint": "./eslint/index.js",
+    "./tailwind": "./tailwind/index.ts"
+  },
+  "devDependencies": {
+    "@types/eslint": "^9.6.0",
+    "eslint": "^9.7.0",
+    "typescript": "^5.5.0"
+  }
+}

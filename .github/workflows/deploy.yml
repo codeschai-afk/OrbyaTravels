@@ -1,0 +1,81 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - dev       # → staging
+      - main      # → production
+
+env:
+  REGISTRY: ghcr.io
+  ORG: orbyatravel
+
+jobs:
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        app: [web, provider, employee, admin, api]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.app }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.app }}.Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.app }}:${{ github.sha }}
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build-and-push
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Update Container Apps (staging)
+        run: |
+          for app in web provider employee admin api; do
+            az containerapp update \
+              --name orbya-$app-staging \
+              --resource-group orbya-staging-rg \
+              --image ghcr.io/${{ env.ORG }}/$app:${{ github.sha }}
+          done
+
+  deploy-production:
+    name: Deploy to Production
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Update Container Apps (production)
+        run: |
+          for app in web provider employee admin api; do
+            az containerapp update \
+              --name orbya-$app \
+              --resource-group orbya-prod-rg \
+              --image ghcr.io/${{ env.ORG }}/$app:${{ github.sha }}
+          done
