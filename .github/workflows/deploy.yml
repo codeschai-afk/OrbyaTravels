@@ -54,6 +54,7 @@ jobs:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
+          command_timeout: 20m
           script: |
             set -e
             cd /opt/orbya
