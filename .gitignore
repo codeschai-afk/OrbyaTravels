@@ -50,3 +50,4 @@ coverage/
 # Local secrets reference — never commit
 var.txt
 .claude
+#check ci/cd pipeline
