@@ -45,3 +45,6 @@ coverage/
 
 # Markdown files
 *.md
+
+# Local secrets reference — never commit
+var.txt
