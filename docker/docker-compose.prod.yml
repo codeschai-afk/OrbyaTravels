@@ -34,6 +34,8 @@ services:
     image: ghcr.io/codeschai-afk/web:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
+    environment:
+      NEXTAUTH_URL: https://orbyatravel.com
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -42,6 +44,8 @@ services:
     image: ghcr.io/codeschai-afk/provider:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
+    environment:
+      NEXTAUTH_URL: https://provider.orbyatravel.com
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -50,6 +54,8 @@ services:
     image: ghcr.io/codeschai-afk/employee:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
+    environment:
+      NEXTAUTH_URL: https://staff.orbyatravel.com
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -58,6 +64,8 @@ services:
     image: ghcr.io/codeschai-afk/admin:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
+    environment:
+      NEXTAUTH_URL: https://admin.orbyatravel.com
     depends_on:
       migrate:
         condition: service_completed_successfully
