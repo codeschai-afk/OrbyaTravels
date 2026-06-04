@@ -18,7 +18,10 @@ services:
 
   migrate:
     image: ghcr.io/codeschai-afk/api:${IMAGE_TAG}
-    command: ['node', '-e', "require('child_process').execSync('node_modules/.bin/prisma migrate deploy --schema packages/db/schema.prisma', {stdio:'inherit'})"]
+    command:
+      - sh
+      - -c
+      - packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/schema.prisma
     env_file: ../.env.prod
     depends_on:
       postgres:
