@@ -48,6 +48,18 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync compose files to Droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          source: "docker/docker-compose.prod.yml,docker/Caddyfile"
+          target: /opt/orbya/docker
+          strip_components: 1
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -64,7 +76,7 @@ jobs:
             # Pull all new images
             docker compose --env-file .env.prod -f docker/docker-compose.prod.yml pull
 
-            # Restart (--env-file loads vars for compose substitution, e.g. POSTGRES_USER)
+            # Restart containers (--env-file loads vars for compose substitution)
             docker compose --env-file .env.prod -f docker/docker-compose.prod.yml up -d --remove-orphans
 
             # Remove dangling images to save disk space
