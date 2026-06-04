@@ -29,7 +29,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 honojs
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=builder /app/packages/db/schema.prisma ./packages/db/schema.prisma
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
