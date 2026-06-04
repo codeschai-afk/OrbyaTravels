@@ -27,7 +27,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const parsed = z.object({ email: z.string().email(), password: z.string().min(8) }).safeParse(credentials)
           if (!parsed.success) return null
           const user = await prisma.user.findUnique({ where: { email: parsed.data.email } })
-          if (!user?.password_hash || user.role !== 'ADMIN') return null
+          if (!user?.password_hash || user.role !== 'EMPLOYEE') return null
           const valid = await bcrypt.compare(parsed.data.password, user.password_hash)
           if (!valid) return null
           return { id: user.id, email: user.email, name: user.name, role: user.role }

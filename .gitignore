@@ -43,8 +43,9 @@ coverage/
 # Misc
 *.tsbuildinfo
 
-# Markdown files
+# Markdown files (except project-level docs)
 *.md
+!calude.md
 
 # Local secrets reference — never commit
 var.txt
