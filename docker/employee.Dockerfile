@@ -1,4 +1,5 @@
 FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat openssl
 RUN npm install -g pnpm@11.5.1
 
 FROM base AS deps
