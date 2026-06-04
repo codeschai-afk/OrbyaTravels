@@ -39,7 +39,7 @@ export default function StaffSignInPage() {
         <div className="bg-gray-800 rounded-2xl border border-gray-700 p-8">
           <h1 className="text-xl font-bold text-white mb-6">Staff sign in</h1>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {errors.root && (
               <div className="bg-red-900/40 border border-red-700 text-red-400 text-sm rounded-xl px-4 py-3">
                 {errors.root.message}
