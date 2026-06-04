@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { signOut } from 'next-auth/react'
 import {
   Globe, Users, MapPin, Building2, BarChart3, LogOut, LayoutDashboard,
 } from 'lucide-react'
@@ -48,15 +49,13 @@ export function Sidebar() {
 
       {/* Sign out */}
       <div className="px-3 py-4 border-t border-gray-800">
-        <form action="/api/auth/signout" method="POST">
-          <button
-            type="submit"
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 hover:text-white transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign out
-          </button>
-        </form>
+        <button
+          onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 hover:text-white transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign out
+        </button>
       </div>
     </aside>
   )
