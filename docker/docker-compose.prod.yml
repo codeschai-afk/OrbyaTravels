@@ -19,6 +19,7 @@ services:
   migrate:
     image: ghcr.io/codeschai-afk/api:${IMAGE_TAG}
     user: root
+    working_dir: /app
     command:
       - sh
       - -c
