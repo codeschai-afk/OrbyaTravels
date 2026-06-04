@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
-import { countries } from './countries'
-import { listings } from './listings'
-import { bookings } from './bookings'
+import { countries } from './countries.js'
+import { listings } from './listings.js'
+import { bookings } from './bookings.js'
 
 export const v1 = new Hono()
 

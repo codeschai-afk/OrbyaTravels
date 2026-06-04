@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { prisma } from '@orbyatravel/db'
-import { generateSlug } from '../lib/slug'
-import { notFound, badRequest, conflict, serverError } from '../lib/errors'
+import { generateSlug } from '../lib/slug.js'
+import { notFound, badRequest, conflict, serverError } from '../lib/errors.js'
 
 export const listings = new Hono()
 

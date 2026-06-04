@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateSlug, slugToTitle } from '../lib/slug'
+import { generateSlug, slugToTitle } from '../lib/slug.js'
 
 describe('generateSlug', () => {
   it('lowercases and replaces spaces with hyphens', () => {

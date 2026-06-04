@@ -7,7 +7,7 @@ describe('API response shape', () => {
     app.get('/test', (c) => c.json({ data: { id: '1', name: 'test' } }))
 
     const res = await app.request('/test')
-    const json = await res.json()
+    const json = await res.json() as Record<string, unknown>
 
     expect(res.status).toBe(200)
     expect(json).toHaveProperty('data')
@@ -21,7 +21,7 @@ describe('API response shape', () => {
     )
 
     const res = await app.request('/test')
-    const json = await res.json()
+    const json = await res.json() as Record<string, unknown>
 
     expect(res.status).toBe(404)
     expect(json.error).toHaveProperty('code', 'NOT_FOUND')
@@ -38,7 +38,7 @@ describe('API response shape', () => {
     )
 
     const res = await app.request('/test')
-    const json = await res.json()
+    const json = await res.json() as Record<string, unknown>
 
     expect(Array.isArray(json.data)).toBe(true)
     expect(json.meta).toMatchObject({ page: 1, total: 2 })
@@ -49,7 +49,7 @@ describe('API response shape', () => {
     app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
     const res = await app.request('/health')
-    const json = await res.json()
+    const json = await res.json() as Record<string, unknown>
 
     expect(res.status).toBe(200)
     expect(json.status).toBe('ok')
