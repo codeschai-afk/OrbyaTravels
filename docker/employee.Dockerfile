@@ -21,6 +21,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/employee/node_modules ./apps/employee/node_modules
 COPY . .
+RUN pnpm --filter @orbyatravel/db build
 RUN pnpm --filter @orbyatravel/employee build
 
 FROM base AS runner
