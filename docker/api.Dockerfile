@@ -4,7 +4,12 @@ RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/web/package.json ./apps/web/
+COPY apps/provider/package.json ./apps/provider/
+COPY apps/employee/package.json ./apps/employee/
+COPY apps/admin/package.json ./apps/admin/
 COPY apps/api/package.json ./apps/api/
+COPY packages/ui/package.json ./packages/ui/
 COPY packages/types/package.json ./packages/types/
 COPY packages/db/package.json ./packages/db/
 COPY packages/config/package.json ./packages/config/
