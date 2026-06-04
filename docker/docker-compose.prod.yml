@@ -17,7 +17,7 @@ services:
       - api
 
   migrate:
-    image: ghcr.io/orbyatravel/api:${IMAGE_TAG}
+    image: ghcr.io/codeschai-afk/api:${IMAGE_TAG}
     command: ['node', '-e', "require('child_process').execSync('node_modules/.bin/prisma migrate deploy --schema packages/db/schema.prisma', {stdio:'inherit'})"]
     env_file: ../.env.prod
     depends_on:
@@ -26,7 +26,7 @@ services:
     restart: on-failure
 
   web:
-    image: ghcr.io/orbyatravel/web:${IMAGE_TAG}
+    image: ghcr.io/codeschai-afk/web:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
     depends_on:
@@ -34,7 +34,7 @@ services:
         condition: service_completed_successfully
 
   provider:
-    image: ghcr.io/orbyatravel/provider:${IMAGE_TAG}
+    image: ghcr.io/codeschai-afk/provider:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
     depends_on:
@@ -42,7 +42,7 @@ services:
         condition: service_completed_successfully
 
   employee:
-    image: ghcr.io/orbyatravel/employee:${IMAGE_TAG}
+    image: ghcr.io/codeschai-afk/employee:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
     depends_on:
@@ -50,7 +50,7 @@ services:
         condition: service_completed_successfully
 
   admin:
-    image: ghcr.io/orbyatravel/admin:${IMAGE_TAG}
+    image: ghcr.io/codeschai-afk/admin:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
     depends_on:
@@ -58,7 +58,7 @@ services:
         condition: service_completed_successfully
 
   api:
-    image: ghcr.io/orbyatravel/api:${IMAGE_TAG}
+    image: ghcr.io/codeschai-afk/api:${IMAGE_TAG}
     restart: unless-stopped
     env_file: ../.env.prod
     depends_on:
