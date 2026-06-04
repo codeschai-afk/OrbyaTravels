@@ -52,6 +52,22 @@ services:
       - redis
       - meilisearch
 
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: orbya
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: orbya
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U orbya -d orbya']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     ports:
@@ -69,5 +85,6 @@ services:
       - meilisearch_data:/meili_data
 
 volumes:
+  postgres_data:
   redis_data:
   meilisearch_data:

@@ -1,0 +1,19 @@
+orbyatravel.com {
+	reverse_proxy web:3000
+}
+
+provider.orbyatravel.com {
+	reverse_proxy provider:3001
+}
+
+staff.orbyatravel.com {
+	reverse_proxy employee:3002
+}
+
+admin.orbyatravel.com {
+	reverse_proxy admin:3003
+}
+
+api.orbyatravel.com {
+	reverse_proxy api:4000
+}

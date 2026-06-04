@@ -1,0 +1,113 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - provider
+      - employee
+      - admin
+      - api
+
+  migrate:
+    image: ghcr.io/orbyatravel/api:${IMAGE_TAG}
+    command: ['node', '-e', "require('child_process').execSync('node_modules/.bin/prisma migrate deploy --schema packages/db/schema.prisma', {stdio:'inherit'})"]
+    env_file: ../.env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  web:
+    image: ghcr.io/orbyatravel/web:${IMAGE_TAG}
+    restart: unless-stopped
+    env_file: ../.env.prod
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  provider:
+    image: ghcr.io/orbyatravel/provider:${IMAGE_TAG}
+    restart: unless-stopped
+    env_file: ../.env.prod
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  employee:
+    image: ghcr.io/orbyatravel/employee:${IMAGE_TAG}
+    restart: unless-stopped
+    env_file: ../.env.prod
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  admin:
+    image: ghcr.io/orbyatravel/admin:${IMAGE_TAG}
+    restart: unless-stopped
+    env_file: ../.env.prod
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    image: ghcr.io/orbyatravel/api:${IMAGE_TAG}
+    restart: unless-stopped
+    env_file: ../.env.prod
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      meilisearch:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command: >
+      postgres
+        -c shared_buffers=128MB
+        -c max_connections=50
+        -c work_mem=4MB
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.9
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_API_KEY}
+      MEILI_MAX_INDEXING_MEMORY: 200mb
+    volumes:
+      - meilisearch_data:/meili_data
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  redis_data:
+  meilisearch_data:
