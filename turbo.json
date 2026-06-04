@@ -24,11 +24,13 @@
         "BREVO_SMTP_HOST",
         "BREVO_SMTP_PORT",
         "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME",
+        "CLOUDINARY_URL",
         "CLOUDINARY_CLOUD_NAME",
         "CLOUDINARY_API_KEY",
         "CLOUDINARY_API_SECRET",
         "MEILISEARCH_HOST",
-        "MEILISEARCH_API_KEY"
+        "MEILISEARCH_API_KEY",
+        "PORT"
       ]
     },
     "dev": {
