@@ -61,10 +61,10 @@ jobs:
             export IMAGE_TAG=${{ github.sha }}
 
             # Pull all new images
-            docker compose -f docker/docker-compose.prod.yml pull
+            docker compose --env-file .env.prod -f docker/docker-compose.prod.yml pull
 
-            # Restart with zero-downtime (Caddy stays up, app containers replace one by one)
-            docker compose -f docker/docker-compose.prod.yml up -d --remove-orphans
+            # Restart (--env-file loads vars for compose substitution, e.g. POSTGRES_USER)
+            docker compose --env-file .env.prod -f docker/docker-compose.prod.yml up -d --remove-orphans
 
             # Remove dangling images to save disk space
             docker image prune -f
