@@ -46,13 +46,14 @@ orbyatravel/
 │   ├── employee.Dockerfile
 │   ├── admin.Dockerfile
 │   ├── api.Dockerfile
+│   ├── Caddyfile                  Reverse proxy + automatic HTTPS
 │   ├── docker-compose.yml         Local dev
-│   └── docker-compose.prod.yml    Production reference
+│   └── docker-compose.prod.yml    Production (DigitalOcean Droplet)
 │
 ├── .github/
-│   └── workflows/    CI/CD — GitHub Actions
+│   └── workflows/    CI/CD — GitHub Actions → GHCR → Droplet SSH deploy
 │
-└── infra/            Azure bicep/scripts, provisioning notes
+└── infra/            DigitalOcean provisioning notes
 ```
 
 **Build tool:** Turborepo. Run `turbo dev` from root to start all apps.
@@ -62,7 +63,7 @@ orbyatravel/
 ## Tech Stack
 
 ### Frontend (all four portals)
-- Next.js 14, App Router, TypeScript
+- Next.js 14, App Router, TypeScript, `output: 'standalone'` (required for Docker)
 - Tailwind CSS + shadcn/ui
 - Zustand (client state), TanStack Query (server state)
 - React Hook Form + Zod (forms + validation)
@@ -72,8 +73,8 @@ orbyatravel/
 ### Backend (apps/api)
 - Hono on Node.js, TypeScript
 - Prisma ORM
-- PostgreSQL via Supabase (managed cloud, not self-hosted)
-- Redis for caching
+- PostgreSQL 16 — self-hosted in Docker on the same Droplet
+- Redis 7 for caching
 - BullMQ on Redis for background job queues
 - Meilisearch for full-text search
 - Cloudinary for file/image storage and CDN
@@ -91,7 +92,7 @@ orbyatravel/
 ### Notifications
 - Brevo (SMTP + transactional email API)
 - Twilio — SMS
-- Supabase Realtime — live booking status updates in UI
+- Live booking updates — Server-Sent Events via Hono (planned, Phase 3)
 
 ### Trip Planner (no LLM for now)
 - Rule-based itinerary builder — customer selects destination, dates, traveler count
@@ -102,22 +103,21 @@ orbyatravel/
 
 ---
 
-## Database — Supabase (Managed Cloud)
+## Database — Self-Hosted PostgreSQL
 
-Using **Supabase cloud** (supabase.com), not self-hosted. The database is standard PostgreSQL but the connection strings and auth tokens come from the Supabase dashboard.
+PostgreSQL 16 runs as a Docker container on the same DigitalOcean Droplet. No Supabase, no PgBouncer, no managed service.
 
 ```
-DATABASE_URL        pooled connection (PgBouncer) — use for queries
-DIRECT_URL          direct connection — use only for migrations (prisma migrate)
+DATABASE_URL    postgresql://orbya:<password>@postgres:5432/orbya
 ```
 
+- `DATABASE_URL` is the same URL for both queries and migrations — no split needed
 - Prisma schema lives in `packages/db/schema.prisma`
-- Run migrations with: `prisma migrate deploy` (uses DIRECT_URL)
-- Row Level Security (RLS) is ON — each portal only sees its own data
-- PgBouncer is handled by Supabase automatically on the pooled URL
-- Backups are managed by Supabase on paid plan — verify backup retention in dashboard
+- Run migrations with: `prisma migrate deploy` (runs in a one-shot init container on deploy)
+- Data is persisted in a named Docker volume: `postgres_data`
+- Backups: daily `pg_dump` to a local file (see `docker/docker-compose.prod.yml`)
 
-**Never bypass RLS.** Cross-portal data access goes through Supabase service role on server-side only, never exposed to client.
+**No RLS.** Data isolation between portals is enforced at the application layer via RBAC middleware in the API. The API is the only process that touches the database — portals never connect to Postgres directly.
 
 ---
 
@@ -162,7 +162,7 @@ Admin controls the list of available destination countries. Customers cannot boo
 
 ### Admin can:
 - Add a country: name, ISO code, slug, description, travel advisory level
-- Upload multiple hero images per country (stored on Cloudflare R2, served via CDN)
+- Upload multiple hero images per country (stored on Cloudinary, served via CDN)
 - Toggle active/inactive — inactive countries are hidden from customer search entirely
 - Set a featured flag — featured countries appear on the homepage carousel
 
@@ -205,48 +205,52 @@ enum AdvisoryLevel {
 }
 ```
 
-Country images upload through the API's file upload endpoint, same as provider media. Admin uploads -> API validates -> uploads to Cloudinary -> stores URL in CountryImage table.
+Country images upload through the API's file upload endpoint. Admin uploads → API validates → uploads to Cloudinary → stores URL in CountryImage table.
 
 ---
 
-## Deployment — Vercel
+## Deployment — DigitalOcean Droplet
 
-All Next.js apps are deployed on **Vercel**. Each app is a separate Vercel project linked to this monorepo, with its root directory set to the relevant `apps/*` folder.
+All services run as Docker containers on a single DigitalOcean Droplet. Caddy handles reverse proxying and automatic HTTPS via Let's Encrypt.
 
 ```
-Vercel Project        App dir          Domain
-------------------------------------------------------
-orbya-web             apps/web         orbyatravel.com
-orbya-provider        apps/provider    provider.orbyatravel.com
-orbya-employee        apps/employee    staff.orbyatravel.com
-orbya-admin           apps/admin       admin.orbyatravel.com
-orbya-api             apps/api         api.orbyatravel.com (Vercel Serverless/Edge)
+Droplet spec:   $18/mo — Premium AMD, 2 vCPU, 2 GB RAM, 60 GB SSD, 3 TB transfer
+OS:             Ubuntu 24.04 LTS
+Docker:         docker.io + docker-compose-plugin
+Image registry: GitHub Container Registry (GHCR) — ghcr.io/orbyatravel/<app>
+Compose file:   /opt/orbya/docker/docker-compose.prod.yml
+Env vars:       /opt/orbya/.env.prod  (never committed — lives on Droplet only)
 ```
+
+### Container layout on the Droplet
+```
+caddy        443/80  →  routes to app containers by hostname
+web          3000        orbyatravel.com
+provider     3001        provider.orbyatravel.com
+employee     3002        staff.orbyatravel.com
+admin        3003        admin.orbyatravel.com
+api          4000        api.orbyatravel.com
+postgres     5432        internal only
+redis        6379        internal only
+meilisearch  7700        internal only
+```
+
+App containers are not exposed on public ports — all traffic enters through Caddy on 80/443.
 
 ### DNS and routing
 - Cloudflare is the DNS authority for orbyatravel.com
-- Each Vercel project has its custom domain configured in the Vercel dashboard
-- Cloudflare proxies traffic — set SSL mode to **Full (strict)** to avoid redirect loops
-- staff and admin subdomains additionally gated by Cloudflare Zero Trust before reaching Vercel
+- All five subdomains have A records pointing to the Droplet IP
+- Cloudflare proxy is ON — set SSL mode to **Full (strict)**
+- staff and admin subdomains are additionally gated by Cloudflare Zero Trust before reaching the Droplet
 
-### Local dev vs production
-```
-Local dev:    Docker Compose (docker/docker-compose.yml) or turbo dev
-              All services on localhost with port map below
-              Uses .env.local per app
-
-Production:   Vercel
-              Env vars set per-project in Vercel dashboard (or via Vercel CLI)
-              Uses production values stored in Vercel environment variables
-```
-
-### Important Vercel env vars per app
-Each Vercel project must have `NEXTAUTH_URL` set to its own public domain:
-```
-orbya-admin     NEXTAUTH_URL=https://admin.orbyatravel.com
-orbya-employee  NEXTAUTH_URL=https://staff.orbyatravel.com
-orbya-web       NEXTAUTH_URL=https://orbyatravel.com
-orbya-provider  NEXTAUTH_URL=https://provider.orbyatravel.com
+### One-time Droplet setup (manual)
+```bash
+apt update && apt install -y docker.io docker-compose-plugin
+mkdir -p /opt/orbya/docker
+# Copy docker-compose.prod.yml and Caddyfile to /opt/orbya/docker/
+# Create /opt/orbya/.env.prod with all production secrets
+echo $GITHUB_TOKEN | docker login ghcr.io -u <github-username> --password-stdin
+cd /opt/orbya && IMAGE_TAG=<sha> docker compose -f docker/docker-compose.prod.yml up -d
 ```
 
 ---
@@ -254,40 +258,62 @@ orbya-provider  NEXTAUTH_URL=https://provider.orbyatravel.com
 ## CI/CD Pipeline
 
 ```
-GitHub Push
-    |
-GitHub Actions (CI) + Vercel (deploy)
-    |-- lint + typecheck (turbo lint)     [GitHub Actions]
-    |-- run tests (Vitest)                [GitHub Actions]
-    |-- Vercel auto-deploys on push       [Vercel Git integration]
-
-PR opened         preview deployment per PR (Vercel preview URL)
-merge to dev      deploy to staging (Vercel dev/staging environment)
-merge to main     deploy to production (Vercel production environment)
+git push origin main
+        ↓
+GitHub Actions — CI job
+  lint (turbo lint) + typecheck (turbo typecheck) + tests (vitest)   ~3 min
+        ↓
+GitHub Actions — build-and-push job
+  builds 5 Docker images in parallel, pushes to GHCR                ~10-15 min
+  tags: ghcr.io/orbyatravel/<app>:<git-sha>
+        ↓
+GitHub Actions — deploy job
+  SSH into Droplet
+  IMAGE_TAG=<sha> docker compose -f docker/docker-compose.prod.yml pull
+  docker compose -f docker/docker-compose.prod.yml up -d --remove-orphans
+                                                                     ~2 min
+        ↓
+Live. Total time push → live: ~15-20 min
 ```
 
-Vercel watches the repo via its GitHub integration and deploys automatically. The GitHub Actions workflow handles lint/test only — no manual deploy steps needed.
+### Required GitHub Secrets
+```
+GITHUB_TOKEN      auto-provided (GHCR push)
+DO_HOST           Droplet IP address
+DO_USER           deploy user (root or orbya)
+DO_SSH_KEY        SSH private key for the deploy user
+```
+
+### Branching
+```
+main    production  →  auto-deploys to Droplet on push
+dev     staging     →  no auto-deploy (manual docker compose on a second droplet, if needed)
+feat/*  feature work
+fix/*   bug fixes
+```
+
+PRs always target `dev`. Only `dev` merges into `main` after staging sign-off.
 
 ---
 
 ## Environment Configuration
 
 ```
-.env.local         Local dev (per app in apps/*)
+Local dev:    .env.local per app (apps/*/.env.local)
+Production:   /opt/orbya/.env.prod on the Droplet — never committed to git
 ```
 
-Production env vars are set in the **Vercel dashboard** per project. Required vars — never hardcode any of these:
+Required vars — never hardcode any of these:
 ```
-# Database (Supabase)
-DATABASE_URL               pooled URL from Supabase dashboard
-DIRECT_URL                 direct URL — migrations only
+# Database (self-hosted PostgreSQL)
+DATABASE_URL               postgresql://orbya:<password>@postgres:5432/orbya
 
 # Redis
-REDIS_URL
+REDIS_URL                  redis://redis:6379
 
 # Auth
 NEXTAUTH_SECRET
-NEXTAUTH_URL               must match the app's own public domain (see Deployment section)
+NEXTAUTH_URL               must match the app's own public domain
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 
@@ -318,13 +344,21 @@ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 MAPBOX_TOKEN
 
 # Search
-MEILISEARCH_HOST
+MEILISEARCH_HOST           http://meilisearch:7700
 MEILISEARCH_API_KEY
 
-# Supabase (for Realtime + service role)
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
+# PostgreSQL container (used by docker-compose.prod.yml)
+POSTGRES_USER              orbya
+POSTGRES_PASSWORD          <strong password>
+POSTGRES_DB                orbya
+```
+
+Each Next.js app also needs `NEXTAUTH_URL` set to its own domain:
+```
+web        NEXTAUTH_URL=https://orbyatravel.com
+provider   NEXTAUTH_URL=https://provider.orbyatravel.com
+employee   NEXTAUTH_URL=https://staff.orbyatravel.com
+admin      NEXTAUTH_URL=https://admin.orbyatravel.com
 ```
 
 ---
@@ -334,30 +368,29 @@ SUPABASE_SERVICE_ROLE_KEY
 Non-negotiable. Do not write code that violates these.
 
 1. No secrets in code or git history. Env vars only. Flag any hardcoded key immediately.
-2. RLS is on for all Supabase tables. Service role key is server-side only, never in client bundles.
-3. staff and admin portals have no public route. Cloudflare Zero Trust blocks before the container sees the request. You still need RBAC inside the app for employee vs admin separation.
-4. RBAC middleware runs on every API route. Role check happens before any business logic.
+2. The API is the only process that connects to PostgreSQL. Portals never get a DATABASE_URL.
+3. RBAC middleware runs on every API route. Role check happens before any business logic.
+4. staff and admin portals have no public route. Cloudflare Zero Trust blocks before the container sees the request. You still need RBAC inside the app for employee vs admin role separation.
 5. All file uploads go through the API. The API validates type and size, then uploads to Cloudinary. No direct client-to-Cloudinary uploads with server-side credentials.
 6. Stripe webhook payloads are always verified with `stripe.webhooks.constructEvent` before processing.
 7. Do not modify SPF/DKIM/DMARC DNS records without understanding what you're changing.
+8. `/opt/orbya/.env.prod` on the Droplet must be `chmod 600` and owned by the deploy user only.
 
 ---
 
 ## What Is Not Built Yet
 
 ```
-Phase 0   Infrastructure + accounts       [in progress]
-Phase 1   Database schema (ERD + Prisma)  [not started]
-Phase 2   Backend API (Hono)              [not started]
+Phase 0   Infrastructure + accounts       [complete]
+Phase 1   Database schema (ERD + Prisma)  [complete]
+Phase 2   Backend API (Hono)              [in progress — routes scaffolded]
 Phase 3   Customer portal                 [not started]
 Phase 4   Service provider portal         [not started]
 Phase 5   Employee portal                 [not started]
 Phase 6   Admin portal                    [not started]
-Phase 7   DevOps + CI/CD                  [not started]
+Phase 7   DevOps + CI/CD                  [in progress — Docker + DO deploy]
 Phase 8   Testing + launch                [not started]
 ```
-
-Start at Phase 1. Everything downstream depends on the schema being correct.
 
 LLM/AI integration is explicitly out of scope for now. Do not add AI SDK dependencies, do not wire Claude API, do not stub AI endpoints. The trip planner is deterministic for the foreseeable future.
 
@@ -388,27 +421,19 @@ fix: booking state transition guard on cancelled orders
 chore: update prisma client after schema migration
 ```
 
-### Branching
-```
-main      production
-dev       staging / integration
-feat/*    feature work
-fix/*     bug fixes
-```
-
-PRs always target `dev`. Only `dev` merges into `main` after staging sign-off.
-
 ---
 
 ## Known Constraints and Gotchas
 
-- Supabase cloud free tier has a 500MB DB limit and pauses inactive projects after 1 week. Use the paid tier for anything beyond local development.
-- Vercel serverless functions have a 10s (Hobby) / 60s (Pro) execution timeout. Long-running jobs (BullMQ workers) cannot run inside Vercel — they need a separate always-on process (Railway, Render, a VPS, etc.).
-- BullMQ workers are separate from the Hono HTTP server. They must run outside Vercel. The worker process must be running for background jobs (email, SMS, search sync) to process.
-- Meilisearch index is eventually consistent with Postgres. BullMQ jobs sync on listing create/update/delete. Never use Meilisearch for anything that requires transactional accuracy.
-- Turborepo caches builds aggressively. If you see stale output, run `turbo clean` before investigating further.
-- Prisma migrations require `DIRECT_URL` (not the pooled URL). PgBouncer drops the prepared statements that Prisma's migration engine needs. Always set both vars.
-- Cloudflare Zero Trust on staff/admin means those containers never see unauthenticated traffic. You still need RBAC inside for employee vs admin role separation — Zero Trust only checks identity, not role.
+- **2 GB RAM is tight.** All 8 containers together use ~1.3–1.5 GB. Do not add memory-hungry services without checking headroom first. Tune Meilisearch and PostgreSQL conservatively (`shared_buffers=128MB`, `MEILI_MAX_INDEXING_MEMORY=200mb`).
+- **BullMQ workers run inside the API container.** The Hono HTTP server and the BullMQ worker share the same Node process (started together in `apps/api/src/index.ts`). This is fine for the Droplet — no separate worker process needed.
+- **Prisma migrations run as a one-shot init container** (`migrate` service in docker-compose.prod.yml) before the api container starts. Never run `prisma migrate dev` in production.
+- **Meilisearch index is eventually consistent with Postgres.** BullMQ jobs sync on listing create/update/delete. Never use Meilisearch for anything requiring transactional accuracy.
+- **Turborepo caches builds aggressively.** If you see stale output, run `turbo clean` before investigating further.
+- **Cloudflare Zero Trust on staff/admin** means those containers never see unauthenticated traffic. You still need RBAC inside for employee vs admin role separation — Zero Trust only checks identity, not role.
+- **Docker image builds happen in GitHub Actions, not on the Droplet.** Never run `docker build` on the Droplet — it will OOM on 2 GB RAM.
+- **Caddy handles TLS automatically.** Do not configure Let's Encrypt manually. Caddy obtains and renews certificates on first request. Ensure ports 80 and 443 are open in the Droplet firewall.
+- **Postgres data lives in a Docker volume (`postgres_data`).** Destroying the volume destroys all data. Never run `docker compose down -v` in production.
 
 ---
 
@@ -420,7 +445,7 @@ PRs always target `dev`. Only `dev` merges into `main` after staging sign-off.
 3002    apps/employee   Employee portal
 3003    apps/admin      Admin portal
 4000    apps/api        Hono API
-5432    PostgreSQL      (local Supabase or direct Postgres for dev)
+5432    PostgreSQL
 6379    Redis
 7700    Meilisearch
 ```
