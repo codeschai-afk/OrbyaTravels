@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit *)",
+      "Bash(pnpm install *)",
+      "Bash(git add *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(python3 *)",
+      "Bash(DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy DIRECT_URL=postgresql://dummy:dummy@localhost:5432/dummy NEXTAUTH_SECRET=dev-secret NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dc6yrmwxw CLOUDINARY_CLOUD_NAME=dc6yrmwxw CLOUDINARY_API_KEY=598175452429721 CLOUDINARY_API_SECRET=X108yBOlJO13Y1UntojeLVnoWag CLOUDINARY_URL=cloudinary://598175452429721:X108yBOlJO13Y1UntojeLVnoWag@dc6yrmwxw NEXT_PUBLIC_API_URL=http://localhost:4000 NEXT_PUBLIC_CONSUMER_URL=http://localhost:3000 NEXT_PUBLIC_PROVIDER_URL=http://localhost:3001 NEXT_PUBLIC_STAFF_URL=http://localhost:3002 NEXT_PUBLIC_ADMIN_URL=http://localhost:3003 pnpm turbo build --filter=@orbyatravel/web --filter=@orbyatravel/admin)",
+      "Bash(grep -E \"^bcryptjs$|^lucide|^@hookform\")"
+    ]
+  }
+}
