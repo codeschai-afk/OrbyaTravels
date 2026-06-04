@@ -28,11 +28,15 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 honojs
-COPY --from=builder /app/apps/api/dist ./dist
+# Copy full workspace so pnpm symlinks resolve correctly at runtime
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=builder /app/packages/db/schema.prisma ./packages/db/schema.prisma
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
+# Run from apps/api so Node resolves deps from apps/api/node_modules
+WORKDIR /app/apps/api
 USER honojs
 EXPOSE 4000
 ENV PORT=4000
