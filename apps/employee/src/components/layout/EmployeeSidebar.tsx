@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { LayoutDashboard, ListChecks, AlertTriangle, Globe, LogOut, Users } from 'lucide-react'
+import { LayoutDashboard, ListChecks, AlertTriangle, Globe, LogOut, Users, MapPin } from 'lucide-react'
 
 const NAV = [
   { href: '/',           label: 'Dashboard', icon: LayoutDashboard },
   { href: '/queue',      label: 'Queue',     icon: ListChecks },
   { href: '/providers',  label: 'Providers', icon: Users },
+  { href: '/places',     label: 'Places',    icon: MapPin },
   { href: '/disputes',   label: 'Disputes',  icon: AlertTriangle },
 ]
 

@@ -126,6 +126,9 @@ importers:
       cloudinary:
         specifier: ^2.4.0
         version: 2.10.0
+      groq-sdk:
+        specifier: ^1.2.1
+        version: 1.2.1
       hono:
         specifier: ^4.5.0
         version: 4.12.23
@@ -336,6 +339,9 @@ importers:
       framer-motion:
         specifier: ^11.3.0
         version: 11.18.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      groq-sdk:
+        specifier: ^1.2.1
+        version: 1.2.1
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
@@ -374,7 +380,7 @@ importers:
         specifier: ^2.4.6
         version: 2.4.6
       '@types/leaflet':
-        specifier: ^1.9.0
+        specifier: ^1.9.21
         version: 1.9.21
       '@types/node':
         specifier: ^22.0.0
@@ -2566,6 +2572,10 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  groq-sdk@1.2.1:
+    resolution: {integrity: sha512-dsDSWJRJf+n2dPiCv7zU3IsJbrh7jfSPqi6vc1q0TTK1oUF6bn+wv4P2VFdynkHpuJ0TTJ57vlpT87judPgVPA==}
+    hasBin: true
 
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
@@ -5705,6 +5715,8 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.11: {}
+
+  groq-sdk@1.2.1: {}
 
   has-bigints@1.1.0: {}
 

@@ -92,6 +92,34 @@ enum FuelType {
   HYBRID
 }
 
+enum PlaceCategory {
+  BEACH
+  TEMPLE
+  MUSEUM
+  MARKET
+  PARK
+  MOUNTAIN
+  CITY
+  VILLAGE
+  RESTAURANT
+  NIGHTLIFE
+  ADVENTURE
+  HISTORICAL
+  OTHER
+}
+
+enum TravelStyle {
+  BUDGET
+  COMFORT
+  LUXURY
+}
+
+enum LegType {
+  PLACE
+  TRANSPORT
+  ACCOMMODATION
+}
+
 // ─────────────────────────────────────────────
 // AUTH — NextAuth v5 compatible
 // ─────────────────────────────────────────────
@@ -115,6 +143,9 @@ model User {
   bookings         Booking[]
   reviews          Review[]
   notifications    Notification[]
+  bucket_list      BucketListItem[]
+  curated_places   Place[]          @relation("PlaceCurator")
+  trip_plans       TripPlan[]
 
   @@map("users")
 }
@@ -240,6 +271,8 @@ model Country {
   hero_images CountryImage[]
   listings    Listing[]
   bookings    Booking[]
+  places      Place[]
+  trip_plans  TripPlan[]
 
   @@map("countries")
 }
@@ -289,6 +322,7 @@ model Listing {
   booking_items     BookingItem[]
   reviews           Review[]
   transport_schedules TransportSchedule[]
+  trip_plan_legs    TripPlanLeg[]
 
   @@unique([slug, type])
   @@index([country_id])
@@ -645,4 +679,119 @@ model Notification {
 
   @@index([user_id, read_at])
   @@map("notifications")
+}
+
+// ─────────────────────────────────────────────
+// TRIP PLANNING — Places, Bucketlist, Itineraries
+// ─────────────────────────────────────────────
+
+model Place {
+  id          String        @id @default(cuid())
+  country_id  String
+  curated_by  String
+  name        String
+  slug        String
+  description String?       @db.Text
+  category    PlaceCategory @default(OTHER)
+  city        String?
+  address     String?
+  latitude    Decimal       @db.Decimal(10, 7)
+  longitude   Decimal       @db.Decimal(10, 7)
+  is_active   Boolean       @default(true)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+
+  country         Country          @relation(fields: [country_id], references: [id])
+  curator         User             @relation("PlaceCurator", fields: [curated_by], references: [id])
+  images          PlaceImage[]
+  bucket_list     BucketListItem[]
+  trip_plan_legs  TripPlanLeg[]
+
+  @@unique([slug, country_id])
+  @@index([country_id])
+  @@index([category])
+  @@map("places")
+}
+
+model PlaceImage {
+  id         String  @id @default(cuid())
+  place_id   String
+  url        String
+  alt_text   String?
+  sort_order Int     @default(0)
+
+  place Place @relation(fields: [place_id], references: [id], onDelete: Cascade)
+
+  @@index([place_id])
+  @@map("place_images")
+}
+
+model BucketListItem {
+  id         String    @id @default(cuid())
+  user_id    String
+  place_id   String
+  notes      String?
+  priority   Int       @default(0)
+  visited_at DateTime?
+  created_at DateTime  @default(now())
+
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  place Place @relation(fields: [place_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, place_id])
+  @@index([user_id])
+  @@map("bucket_list_items")
+}
+
+model TripPlan {
+  id            String      @id @default(cuid())
+  user_id       String
+  country_id    String
+  title         String
+  duration_days Int
+  travel_style  TravelStyle @default(COMFORT)
+  raw_response  Json?
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+
+  user    User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  country Country     @relation(fields: [country_id], references: [id])
+  days    TripPlanDay[]
+
+  @@index([user_id])
+  @@map("trip_plans")
+}
+
+model TripPlanDay {
+  id         String @id @default(cuid())
+  plan_id    String
+  day_number Int
+  title      String?
+  notes      String?
+
+  plan TripPlan     @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  legs TripPlanLeg[]
+
+  @@index([plan_id])
+  @@map("trip_plan_days")
+}
+
+model TripPlanLeg {
+  id               String  @id @default(cuid())
+  day_id           String
+  order            Int
+  type             LegType
+  place_id         String?
+  listing_id       String?
+  title            String
+  description      String? @db.Text
+  duration_minutes Int?
+  tip              String?
+
+  day     TripPlanDay @relation(fields: [day_id], references: [id], onDelete: Cascade)
+  place   Place?      @relation(fields: [place_id], references: [id])
+  listing Listing?    @relation(fields: [listing_id], references: [id])
+
+  @@index([day_id])
+  @@map("trip_plan_legs")
 }

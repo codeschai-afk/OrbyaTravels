@@ -12,6 +12,17 @@ const users = [
   { email: 'customer@orbyatravel.com', name: 'Customer User', role: 'CUSTOMER' as const },
 ]
 
+const countries = [
+  { name: 'Japan',     iso_code: 'JP', slug: 'japan',     description: 'Ancient temples & futuristic cities',     is_featured: true,  travel_advisory: 'NONE' as const },
+  { name: 'Italy',     iso_code: 'IT', slug: 'italy',     description: 'Renaissance art & coastal villages',       is_featured: true,  travel_advisory: 'NONE' as const },
+  { name: 'Thailand',  iso_code: 'TH', slug: 'thailand',  description: 'Tropical beaches & golden temples',        is_featured: true,  travel_advisory: 'NONE' as const },
+  { name: 'France',    iso_code: 'FR', slug: 'france',    description: 'Lavender fields & haute cuisine',           is_featured: true,  travel_advisory: 'NONE' as const },
+  { name: 'Greece',    iso_code: 'GR', slug: 'greece',    description: 'Whitewashed villages & crystal waters',    is_featured: true,  travel_advisory: 'NONE' as const },
+  { name: 'Morocco',   iso_code: 'MA', slug: 'morocco',   description: 'Sahara dunes & spice bazaars',             is_featured: true,  travel_advisory: 'LOW'  as const },
+  { name: 'Indonesia', iso_code: 'ID', slug: 'indonesia', description: 'Rice terraces, volcanoes & coral reefs',  is_featured: false, travel_advisory: 'NONE' as const },
+  { name: 'Spain',     iso_code: 'ES', slug: 'spain',     description: 'Flamenco, tapas & sun-soaked beaches',    is_featured: false, travel_advisory: 'NONE' as const },
+]
+
 async function main() {
   const hash = await bcrypt.hash(password, 12)
 
@@ -25,6 +36,17 @@ async function main() {
   }
 
   console.log(`\nAll users → password: ${password}`)
+
+  for (const c of countries) {
+    const country = await prisma.country.upsert({
+      where: { slug: c.slug },
+      update: { name: c.name, description: c.description, is_featured: c.is_featured, travel_advisory: c.travel_advisory, is_active: true },
+      create: { ...c, is_active: true },
+    })
+    console.log(`Country   seeded: ${country.name}`)
+  }
+
+  console.log('\nSeed complete.')
 }
 
 main()
