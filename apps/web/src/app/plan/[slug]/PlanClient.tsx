@@ -35,12 +35,13 @@ export interface Place {
 }
 
 interface Props {
-  country:    { id: string; name: string; slug: string; hero: string | null }
-  places:     Place[]
-  isSignedIn: boolean
+  country:       { id: string; name: string; slug: string; hero: string | null }
+  places:        Place[]
+  isSignedIn:    boolean
+  initialCenter: [number, number]
 }
 
-export function PlanClient({ country, places, isSignedIn }: Props) {
+export function PlanClient({ country, places, isSignedIn, initialCenter }: Props) {
   const router  = useRouter()
   const [bucket, setBucket]       = useState<Set<string>>(new Set(places.filter((p) => p.inBucket).map((p) => p.id)))
   const [selected, setSelected]   = useState<Place | null>(null)
@@ -84,7 +85,9 @@ export function PlanClient({ country, places, isSignedIn }: Props) {
       {/* Full-screen map */}
       <div className="flex-1 relative">
         <CountryMap
+          key={country.slug}
           places={mapPlaces}
+          initialCenter={initialCenter}
           selectedId={selected?.id ?? null}
           onSelect={(id) => setSelected(id ? (places.find((p) => p.id === id) ?? null) : null)}
           onBucket={toggleBucket}
