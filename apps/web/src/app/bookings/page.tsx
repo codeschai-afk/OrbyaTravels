@@ -5,12 +5,13 @@ import Link from 'next/link'
 import { CalendarDays, MapPin, Package } from 'lucide-react'
 
 const STATUS_STYLE: Record<string, string> = {
-  DRAFT:     'bg-gray-100 text-gray-600',
-  CONFIRMED: 'bg-blue-100 text-blue-700',
-  PAID:      'bg-green-100 text-green-700',
-  CANCELLED: 'bg-red-100 text-red-600',
-  COMPLETED: 'bg-emerald-100 text-emerald-700',
-  REFUNDED:  'bg-purple-100 text-purple-700',
+  DRAFT:           'bg-gray-100 text-gray-600',
+  PENDING_PAYMENT: 'bg-yellow-100 text-yellow-700',
+  CONFIRMED:       'bg-blue-100 text-blue-700',
+  IN_PROGRESS:     'bg-purple-100 text-purple-700',
+  COMPLETED:       'bg-emerald-100 text-emerald-700',
+  CANCELLED:       'bg-red-100 text-red-600',
+  REFUNDED:        'bg-gray-100 text-gray-500',
 }
 
 function fmt(price: unknown) {

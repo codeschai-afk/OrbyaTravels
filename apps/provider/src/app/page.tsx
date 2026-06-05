@@ -62,10 +62,11 @@ export default async function ProviderDashboard() {
     )
   }
 
-  const [total, approved, pending] = await Promise.all([
+  const [total, approved, pending, activeBookings] = await Promise.all([
     prisma.listing.count({ where: { provider_id: profile.id } }),
     prisma.listing.count({ where: { provider_id: profile.id, approval_status: 'APPROVED' } }),
     prisma.listing.count({ where: { provider_id: profile.id, approval_status: 'PENDING' } }),
+    prisma.booking.count({ where: { items: { some: { listing: { provider_id: profile.id } } }, status: { in: ['CONFIRMED', 'IN_PROGRESS'] } } }),
   ])
 
   return (
@@ -85,11 +86,12 @@ export default async function ProviderDashboard() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Total listings', value: total, color: 'text-gray-900' },
-          { label: 'Approved',       value: approved, color: 'text-emerald-600' },
-          { label: 'Pending review', value: pending, color: 'text-orange-500' },
+          { label: 'Total listings',   value: total,          color: 'text-gray-900' },
+          { label: 'Approved',         value: approved,       color: 'text-emerald-600' },
+          { label: 'Pending review',   value: pending,        color: 'text-orange-500' },
+          { label: 'Active bookings',  value: activeBookings, color: 'text-blue-600' },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className={`text-3xl font-bold ${color}`}>{value}</div>
@@ -114,7 +116,11 @@ export default async function ProviderDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Link href="/bookings" className="bg-white rounded-xl border border-gray-200 p-5 hover:border-brand-400 hover:shadow-sm transition-all">
+          <div className="font-semibold text-gray-900 mb-1">Bookings</div>
+          <p className="text-sm text-gray-500">View and manage customer bookings for your listings</p>
+        </Link>
         <Link href="/listings" className="bg-white rounded-xl border border-gray-200 p-5 hover:border-brand-400 hover:shadow-sm transition-all">
           <div className="font-semibold text-gray-900 mb-1">All listings</div>
           <p className="text-sm text-gray-500">View and manage every listing you have created</p>

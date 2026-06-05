@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { prisma } from '@orbyatravel/db'
 import { auth } from '@/lib/auth'
-import { Hotel, Car, Bus, Plane, Train, ArrowLeft, Star, Clock, MapPin, CheckCircle, Info } from 'lucide-react'
+import { Hotel, Car, Bus, Plane, Train, ArrowLeft, Star, Clock, MapPin, CheckCircle } from 'lucide-react'
+import { BookingSection } from './BookingSection'
 
 const TYPE_META: Record<string, { label: string; icon: React.FC<{ className?: string }> }> = {
   ACCOMMODATION: { label: 'Hotel',      icon: Hotel },
@@ -32,12 +33,13 @@ export default async function ListingDetailPage({ params }: { params: { slug: st
       country:       true,
       provider:      { select: { business_name: true, city: true, description: true } },
       images:        { orderBy: { sort_order: 'asc' } },
-      accommodation: { include: { room_types: { take: 5 } } },
-      flight:        { include: { schedules: { where: { is_active: true }, take: 5 } } },
-      bus:           true,
-      train:         true,
-      car_rental:    true,
-      reviews:       { take: 5, orderBy: { created_at: 'desc' }, include: { user: { select: { name: true } } } },
+      accommodation:       { include: { room_types: { take: 5 } } },
+      flight:              { include: { schedules: { where: { is_active: true, departure_at: { gte: new Date() } }, take: 10, orderBy: { departure_at: 'asc' } } } },
+      bus:                 true,
+      train:               true,
+      car_rental:          true,
+      transport_schedules: { where: { is_active: true, departure_at: { gte: new Date() } }, take: 10, orderBy: { departure_at: 'asc' } },
+      reviews:             { take: 5, orderBy: { created_at: 'desc' }, include: { user: { select: { name: true } } } },
     },
   })
 
@@ -289,21 +291,40 @@ export default async function ListingDetailPage({ params }: { params: { slug: st
             <hr className="border-gray-100" />
 
             {session ? (
-              <>
-                <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5">
-                  <Info className="w-4 h-4 mt-0.5 shrink-0" />
-                  <p>Online booking coming soon. Contact the provider to reserve.</p>
-                </div>
-                <a
-                  href={`mailto:${listing.provider.business_name.toLowerCase().replace(/\s+/g, '')}@orbyatravel.com?subject=Booking enquiry: ${listing.title}`}
-                  className="block text-center w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-3 rounded-xl transition-colors"
-                >
-                  Contact to book
-                </a>
-              </>
+              <BookingSection listing={{
+                id:         listing.id,
+                type:       listing.type,
+                base_price: Number(listing.base_price),
+                country_id: listing.country_id,
+                currency:   listing.currency,
+                slug:       listing.slug,
+                price_per_day: listing.car_rental ? Number(listing.car_rental.price_per_day) : null,
+                room_types: (listing.accommodation?.room_types ?? []).map((rt) => ({
+                  id: rt.id, name: rt.name, capacity: rt.capacity, price_per_night: Number(rt.price_per_night),
+                })),
+                flight_schedules: (listing.flight?.schedules ?? []).map((s) => ({
+                  id: s.id,
+                  departure_at: s.departure_at.toISOString(),
+                  arrival_at:   s.arrival_at.toISOString(),
+                  price_economy:  Number(s.price_economy),
+                  price_business: Number(s.price_business),
+                  price_first:    Number(s.price_first),
+                  seats_economy:  s.seats_economy,
+                  seats_business: s.seats_business,
+                  seats_first:    s.seats_first,
+                })),
+                transport_schedules: listing.transport_schedules.map((s) => ({
+                  id: s.id,
+                  departure_at:   s.departure_at.toISOString(),
+                  arrival_at:     s.arrival_at.toISOString(),
+                  price_per_seat: Number(s.price_per_seat),
+                  seat_class:     s.seat_class,
+                  total_seats:    s.total_seats,
+                })),
+              }} />
             ) : (
               <>
-                <p className="text-sm text-gray-500">Sign in to enquire about booking</p>
+                <p className="text-sm text-gray-500">Sign in to book this listing</p>
                 <Link
                   href={`/auth/signin?callbackUrl=/listings/${listing.slug}`}
                   className="block text-center w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-3 rounded-xl transition-colors"
@@ -318,8 +339,6 @@ export default async function ListingDetailPage({ params }: { params: { slug: st
                 </Link>
               </>
             )}
-
-            <div className="text-xs text-gray-400 text-center">Secure payments · No hidden fees</div>
           </div>
         </div>
       </div>

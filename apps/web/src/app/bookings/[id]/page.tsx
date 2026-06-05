@@ -5,12 +5,13 @@ import Link from 'next/link'
 import { ArrowLeft, MapPin, Package, Clock, CalendarDays } from 'lucide-react'
 
 const STATUS_STYLE: Record<string, string> = {
-  DRAFT:     'bg-gray-100 text-gray-600',
-  CONFIRMED: 'bg-blue-100 text-blue-700',
-  PAID:      'bg-green-100 text-green-700',
-  CANCELLED: 'bg-red-100 text-red-600',
-  COMPLETED: 'bg-emerald-100 text-emerald-700',
-  REFUNDED:  'bg-purple-100 text-purple-700',
+  DRAFT:           'bg-gray-100 text-gray-600',
+  PENDING_PAYMENT: 'bg-yellow-100 text-yellow-700',
+  CONFIRMED:       'bg-blue-100 text-blue-700',
+  IN_PROGRESS:     'bg-purple-100 text-purple-700',
+  COMPLETED:       'bg-emerald-100 text-emerald-700',
+  CANCELLED:       'bg-red-100 text-red-600',
+  REFUNDED:        'bg-gray-100 text-gray-500',
 }
 
 function fmt(price: unknown) {
@@ -25,7 +26,12 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
     where: { id: params.id, customer_id: session.user.id },
     include: {
       country:        { select: { name: true, slug: true } },
-      items:          { include: { listing: { select: { title: true, slug: true, type: true } } } },
+      items: {
+        include: {
+          listing:   { select: { title: true, slug: true, type: true } },
+          room_type: { select: { name: true } },
+        },
+      },
       status_history: { orderBy: { created_at: 'asc' } },
     },
   })
@@ -79,16 +85,34 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
         {booking.items.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
             <h2 className="font-semibold text-gray-900 mb-4">Items</h2>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {booking.items.map((item) => (
-                <div key={item.id} className="flex items-center gap-3">
-                  <Package className="w-4 h-4 text-gray-300 shrink-0" />
+                <div key={item.id} className="flex items-start gap-3 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
+                  <Package className="w-4 h-4 text-gray-300 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <Link href={`/listings/${item.listing.slug}`}
                       className="text-sm font-medium text-gray-900 hover:text-brand-600 truncate block">
                       {item.listing.title}
                     </Link>
-                    <p className="text-xs text-gray-400">{item.listing.type.replace('_', ' ')} · qty {item.quantity}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{item.listing.type.replace('_', ' ')}</p>
+                    {item.check_in_date && item.check_out_date && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(item.check_in_date).toLocaleDateString()} → {new Date(item.check_out_date).toLocaleDateString()}
+                        {item.room_type && <span> · {item.room_type.name}</span>}
+                        {item.quantity > 1 && <span> · {item.quantity} guests</span>}
+                      </p>
+                    )}
+                    {item.pickup_date && item.return_date && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Pickup: {new Date(item.pickup_date).toLocaleDateString()} · Return: {new Date(item.return_date).toLocaleDateString()}
+                      </p>
+                    )}
+                    {item.passenger_count && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {item.passenger_count} passenger{item.passenger_count !== 1 ? 's' : ''}
+                        {item.seat_class && <span> · {item.seat_class}</span>}
+                      </p>
+                    )}
                   </div>
                   <p className="text-sm font-semibold text-gray-800 shrink-0">{fmt(item.total_price)}</p>
                 </div>

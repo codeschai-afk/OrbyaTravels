@@ -5,22 +5,23 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, Hotel, Car, Bus, Plane, Train, List,
-  BarChart3, CreditCard, UserCircle, LogOut, Globe,
+  BarChart3, CreditCard, UserCircle, LogOut, Globe, CalendarDays,
 } from 'lucide-react'
 
 const NAV = [
-  { href: '/',          label: 'Dashboard',  icon: LayoutDashboard },
+  { href: '/',          label: 'Dashboard',   icon: LayoutDashboard },
+  { href: '/bookings',  label: 'Bookings',    icon: CalendarDays },
   { href: '/listings',  label: 'All listings', icon: List },
   { divider: true },
-  { href: '/hotels',    label: 'Hotels',     icon: Hotel },
+  { href: '/hotels',    label: 'Hotels',      icon: Hotel },
   { href: '/cars',      label: 'Car rentals', icon: Car },
-  { href: '/buses',     label: 'Buses',      icon: Bus },
-  { href: '/flights',   label: 'Flights',    icon: Plane },
-  { href: '/trains',    label: 'Trains',     icon: Train },
+  { href: '/buses',     label: 'Buses',       icon: Bus },
+  { href: '/flights',   label: 'Flights',     icon: Plane },
+  { href: '/trains',    label: 'Trains',      icon: Train },
   { divider: true },
-  { href: '/analytics', label: 'Analytics',  icon: BarChart3 },
-  { href: '/payouts',   label: 'Payouts',    icon: CreditCard },
-  { href: '/profile',   label: 'Profile',    icon: UserCircle },
+  { href: '/analytics', label: 'Analytics',   icon: BarChart3 },
+  { href: '/payouts',   label: 'Payouts',     icon: CreditCard },
+  { href: '/profile',   label: 'Profile',     icon: UserCircle },
 ]
 
 export function ProviderSidebar() {
