@@ -12,10 +12,10 @@ import {
 const CountryMap = dynamic(() => import('./CountryMap'), {
   ssr:     false,
   loading: () => (
-    <div className="w-full h-full bg-[#f5f3ee] flex items-center justify-center">
+    <div className="w-full h-full bg-[#07090f] flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-        <span className="text-xs text-gray-400 font-medium tracking-wide">Loading map…</span>
+        <Loader2 className="w-8 h-8 animate-spin text-white/20" />
+        <span className="text-xs text-white/30 font-medium tracking-widest uppercase">Loading map…</span>
       </div>
     </div>
   ),
@@ -96,7 +96,7 @@ export function PlanClient({ country, places, isSignedIn, initialCenter }: Props
   const mapPlaces = places.map((p) => ({ ...p, inBucket: bucket.has(p.id) }))
 
   return (
-    <div className="fixed inset-0 pt-16 flex flex-col bg-[#f5f3ee]">
+    <div className="fixed inset-0 pt-16 flex flex-col bg-[#07090f]">
       <div className="flex-1 relative overflow-hidden">
 
         {/* ── Full-screen map ── */}

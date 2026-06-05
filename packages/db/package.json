@@ -17,7 +17,8 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "tsx src/seed.ts"
+    "db:seed": "tsx src/seed.ts",
+    "seed:maps": "tsx src/scripts/upload-country-maps.ts"
   },
   "prisma": {
     "schema": "./schema.prisma"
