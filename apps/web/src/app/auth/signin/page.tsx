@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { Globe, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 const ROLE_URLS: Record<string, string> = {
+  CUSTOMER: '/plan',
   PROVIDER: `${process.env.NEXT_PUBLIC_PROVIDER_URL ?? 'http://localhost:3001'}/listings`,
   EMPLOYEE: `${process.env.NEXT_PUBLIC_STAFF_URL ?? 'http://localhost:3002'}/queue`,
   ADMIN:    `${process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3003'}/`,
@@ -41,13 +42,8 @@ export default function SignInPage() {
 
     const session = await getSession()
     const role = session?.user?.role ?? 'CUSTOMER'
-    const dest = ROLE_URLS[role]
-
-    if (dest) {
-      window.location.href = dest
-    } else {
-      router.push('/trips')
-    }
+    const dest = ROLE_URLS[role] ?? '/plan'
+    window.location.href = dest
   }
 
   return (

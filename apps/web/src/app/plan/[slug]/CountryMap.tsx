@@ -4,13 +4,9 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// Fix default icon paths broken by webpack
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-})
+// CartoDB Voyager — polished, readable, travel-appropriate
+const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+const ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>'
 
 const CATEGORY_COLOR: Record<string, string> = {
   BEACH:      '#3B82F6',
@@ -28,7 +24,7 @@ const CATEGORY_COLOR: Record<string, string> = {
   OTHER:      '#9CA3AF',
 }
 
-const CATEGORY_ICON: Record<string, string> = {
+const CATEGORY_EMOJI: Record<string, string> = {
   BEACH: '🏖️', TEMPLE: '⛩️', MUSEUM: '🏛️', MARKET: '🛒', PARK: '🌳',
   MOUNTAIN: '⛰️', CITY: '🏙️', VILLAGE: '🏡', RESTAURANT: '🍜',
   NIGHTLIFE: '🎶', ADVENTURE: '🧗', HISTORICAL: '🏯', OTHER: '📍',
@@ -36,7 +32,7 @@ const CATEGORY_ICON: Record<string, string> = {
 
 interface Place {
   id: string; name: string; category: string; city: string
-  latitude: number; longitude: number; inBucket: boolean; description: string
+  latitude: number; longitude: number; inBucket: boolean; description: string; image: string | null
 }
 
 interface Props {
@@ -46,57 +42,77 @@ interface Props {
   onBucket:   (id: string) => void
 }
 
+function makeIcon(place: Place) {
+  const color = place.inBucket ? '#EF4444' : (CATEGORY_COLOR[place.category] ?? '#6B7280')
+  const emoji = CATEGORY_EMOJI[place.category] ?? '📍'
+  const ring  = place.inBucket ? '3px solid #FCA5A5' : '3px solid white'
+  const scale = place.inBucket ? 'scale(1.15)' : 'scale(1)'
+
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        width:44px;height:44px;border-radius:50%;background:${color};
+        border:${ring};box-shadow:0 4px 12px rgba(0,0,0,.25);
+        display:flex;align-items:center;justify-content:center;
+        font-size:20px;cursor:pointer;transition:transform .15s;
+        transform:${scale};
+      ">${emoji}</div>`,
+    iconSize:   [44, 44],
+    iconAnchor: [22, 22],
+  })
+}
+
 export default function CountryMap({ places, selectedId, onSelect, onBucket }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef       = useRef<L.Map | null>(null)
   const markersRef   = useRef<Map<string, L.Marker>>(new Map())
 
+  // Init map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
-    const defaultCenter: [number, number] = places.length > 0
-      ? [places.reduce((s, p) => s + p.latitude, 0) / places.length,
-         places.reduce((s, p) => s + p.longitude, 0) / places.length]
-      : [20, 0]
+    const lats = places.map((p) => p.latitude)
+    const lngs = places.map((p) => p.longitude)
+    const center: [number, number] = places.length > 0
+      ? [(Math.min(...lats) + Math.max(...lats)) / 2, (Math.min(...lngs) + Math.max(...lngs)) / 2]
+      : [20, 80]
 
-    const map = L.map(containerRef.current, { center: defaultCenter, zoom: 6, zoomControl: true })
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 18,
-    }).addTo(map)
+    const map = L.map(containerRef.current, {
+      center,
+      zoom: places.length > 0 ? 6 : 5,
+      zoomControl: false,
+    })
+
+    L.tileLayer(TILE_URL, { attribution: ATTRIBUTION, maxZoom: 19, subdomains: 'abcd' }).addTo(map)
+    L.control.zoom({ position: 'bottomright' }).addTo(map)
+
+    // Auto-fit bounds if multiple places
+    if (places.length > 1) {
+      const bounds = L.latLngBounds(places.map((p) => [p.latitude, p.longitude]))
+      map.fitBounds(bounds, { padding: [60, 60] })
+    }
 
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync markers when places/bucket changes
+  // Sync markers
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    const existing = new Set(markersRef.current.keys())
-    const current  = new Set(places.map((p) => p.id))
+    const incoming = new Set(places.map((p) => p.id))
 
-    // Remove stale markers
-    existing.forEach((id) => {
-      if (!current.has(id)) {
-        markersRef.current.get(id)?.remove()
-        markersRef.current.delete(id)
-      }
+    // Remove stale
+    markersRef.current.forEach((m, id) => {
+      if (!incoming.has(id)) { m.remove(); markersRef.current.delete(id) }
     })
 
     places.forEach((place) => {
-      const color = place.inBucket ? '#EF4444' : (CATEGORY_COLOR[place.category] ?? '#6B7280')
-      const emoji = CATEGORY_ICON[place.category] ?? '📍'
-
-      const icon = L.divIcon({
-        className: '',
-        html: `<div style="background:${color};width:36px;height:36px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;">${emoji}</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-      })
-
+      const icon     = makeIcon(place)
       const existing = markersRef.current.get(place.id)
+
       if (existing) {
         existing.setIcon(icon)
         return
@@ -110,15 +126,15 @@ export default function CountryMap({ places, selectedId, onSelect, onBucket }: P
     })
   }, [places, onSelect])
 
-  // Pan to selected marker
+  // Pan + zoom to selected
   useEffect(() => {
-    if (!selectedId || !mapRef.current) return
-    const marker = markersRef.current.get(selectedId)
-    const place  = places.find((p) => p.id === selectedId)
-    if (marker && place) {
-      mapRef.current.setView([place.latitude, place.longitude], Math.max(mapRef.current.getZoom(), 10), { animate: true })
+    const map = mapRef.current
+    if (!map || !selectedId) return
+    const place = places.find((p) => p.id === selectedId)
+    if (place) {
+      map.flyTo([place.latitude, place.longitude], Math.max(map.getZoom(), 11), { animate: true, duration: 0.8 })
     }
   }, [selectedId, places])
 
-  return <div ref={containerRef} className="w-full h-full" />
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 }

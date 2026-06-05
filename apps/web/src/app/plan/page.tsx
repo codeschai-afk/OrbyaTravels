@@ -1,25 +1,43 @@
 import { prisma } from '@orbyatravel/db'
-import { DestinationPicker } from './DestinationPicker'
+import { auth } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import { HeroDestinationPicker } from './HeroDestinationPicker'
 
 export default async function PlanPage() {
+  const session = await auth()
+
   const countries = await prisma.country.findMany({
     where: { is_active: true },
-    select: { id: true, name: true, slug: true, description: true },
+    select: { id: true, name: true, slug: true, description: true, travel_advisory: true },
     orderBy: { name: 'asc' },
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-brand-900 to-brand-700 flex flex-col items-center justify-center px-4 pt-16">
-      <div className="max-w-xl w-full text-center">
-        <p className="text-brand-300 uppercase tracking-widest text-xs font-semibold mb-4">Trip planner</p>
-        <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4 leading-tight">
-          Where are you<br />dreaming of?
+    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
+      {/* Layered background */}
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1488085061387-422e29b40080?auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/80" />
+
+      {/* Content */}
+      <div className="relative z-10 w-full max-w-lg px-6 text-center pt-20 pb-16">
+        {session ? (
+          <p className="text-white/70 text-sm font-medium mb-3">
+            Welcome back, {session.user?.name?.split(' ')[0] ?? 'traveller'} 👋
+          </p>
+        ) : null}
+
+        <h1 className="text-5xl sm:text-6xl font-extrabold text-white mb-3 leading-tight tracking-tight">
+          Where to<br />next?
         </h1>
-        <p className="text-brand-200 text-base mb-10">
-          Pick a destination — we&apos;ll show you the best places, build your bucketlist, and generate a personalised itinerary.
+        <p className="text-white/60 text-lg mb-10">
+          Explore the map, discover hidden gems, and plan your perfect trip.
         </p>
-        <DestinationPicker countries={countries} />
+
+        <HeroDestinationPicker countries={countries} isSignedIn={!!session} />
       </div>
+
+      {/* Bottom scroll hint */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/40 text-xs animate-bounce">↓ scroll</div>
     </div>
   )
 }
