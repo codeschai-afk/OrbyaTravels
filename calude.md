@@ -1,7 +1,7 @@
 # CLAUDE.md — Orbya Travel Platform
 
 > Claude Code context file. Read this before touching any file in this repo.
-> Last updated: June 2026
+> Last updated: 2026-06-05
 
 ---
 
@@ -378,19 +378,110 @@ Non-negotiable. Do not write code that violates these.
 
 ---
 
-## What Is Not Built Yet
+## Build Status
 
 ```
-Phase 0   Infrastructure + accounts       [complete]
-Phase 1   Database schema (ERD + Prisma)  [complete]
-Phase 2   Backend API (Hono)              [in progress — routes scaffolded]
-Phase 3   Customer portal                 [not started]
-Phase 4   Service provider portal         [not started]
-Phase 5   Employee portal                 [not started]
-Phase 6   Admin portal                    [not started]
-Phase 7   DevOps + CI/CD                  [in progress — Docker + DO deploy]
-Phase 8   Testing + launch                [not started]
+Phase 0   Infrastructure + accounts       [✅ complete]
+Phase 1   Database schema (ERD + Prisma)  [✅ complete]
+Phase 2   Backend API (Hono)              [🔄 in progress — routes scaffolded]
+Phase 3   Customer portal (web)           [🔄 in progress — see below]
+Phase 4   Service provider portal         [✅ core complete — see below]
+Phase 5   Employee portal                 [✅ core complete — see below]
+Phase 6   Admin portal                    [✅ core complete — see below]
+Phase 7   DevOps + CI/CD                  [🔄 in progress — Docker + DO deploy]
+Phase 8   Testing + launch                [⬜ not started]
 ```
+
+### Provider Portal — What's Built
+
+**Onboarding / profile setup:**
+- Multi-step wizard at `/profile/setup` (Step 1: service types, Step 2: business info, Step 3: business type + registration number, Step 4: location, Step 5: photo upload 2–7 images via Cloudinary)
+- Schema enums: `BusinessType` (PERSONAL | VAT_REGISTERED | PAN_REGISTERED), `VerificationStatus` (PENDING | APPROVED | REJECTED)
+- `ProviderImage` model storing Cloudinary URLs per provider
+- `/api/upload` — server-side Cloudinary upload (validates type + 10MB limit), stores URL
+- `/api/profile` — GET/POST/PATCH for provider profile inc. photos
+
+**Verification flow:**
+- After signup → PENDING, shown "under review" screen
+- If REJECTED → shown rejection note + link to resubmit via setup wizard
+- If APPROVED → full dashboard with listing management
+
+**Listings:**
+- Full CRUD for Hotels, Car Rentals, Buses, Flights, Trains
+- `/api/listings` handles all 5 types in a single transaction (creates detail record)
+- Analytics page, Payouts placeholder
+
+**Auth:**
+- `/api/auth/[...nextauth]/route.ts` exists in provider app (was missing, caused 404)
+- `NEXTAUTH_SECRET` and `DATABASE_URL` required in each app's own `.env.local`
+
+### Employee Portal — What's Built
+
+- Dashboard with listing stats (pending/approved/rejected/flagged counts)
+- **Queue** — pending listings with approve/reject/flag actions
+- **Providers** — review provider applications (PENDING/APPROVED/REJECTED) with expandable detail, photos, approve button, reject modal with required note
+- **Disputes** — flagged listings table
+- `/api/listings/[id]` PATCH — EMPLOYEE role, updates `approval_status`
+- `/api/providers/[id]` PATCH — EMPLOYEE role, updates `verification_status` + `verification_note`
+
+### Admin Portal — What's Built
+
+- **Users** — table of all users with inline role selector (CUSTOMER/PROVIDER/EMPLOYEE/ADMIN), change takes effect immediately via `/api/users/[id]` PATCH
+- **Providers** — table with `verification_status` badge + `is_verified` toggle (syncs both fields)
+- **Listings** — approval management (approve/reject/flag)
+- **Countries** — destination management
+- **Revenue** — booking stats
+
+### Web Portal (Customer) — What's Built
+
+- Public browsing enabled — only `/bookings`, `/profile`, `/trips` require auth
+- Non-customer roles redirected to their own portals on sign-in
+- Countries / destinations browsable without login
+
+### Prisma Schema Additions (since initial plan)
+
+```prisma
+enum BusinessType     { PERSONAL VAT_REGISTERED PAN_REGISTERED }
+enum VerificationStatus { PENDING APPROVED REJECTED }
+
+model ProviderProfile {
+  // ... existing fields ...
+  service_types       String[]
+  business_type       BusinessType       @default(PERSONAL)
+  registration_number String?
+  city                String?
+  area                String?
+  zip_code            String?
+  latitude            Decimal?           @db.Decimal(10, 7)
+  longitude           Decimal?           @db.Decimal(10, 7)
+  verification_status VerificationStatus @default(PENDING)
+  verification_note   String?            @db.Text
+  photos              ProviderImage[]
+}
+
+model ProviderImage {
+  id            String  @id @default(cuid())
+  provider_id   String
+  url           String
+  cloudinary_id String?
+  alt_text      String?
+  sort_order    Int     @default(0)
+  provider      ProviderProfile @relation(...)
+}
+```
+
+### What's NOT Yet Built
+
+- Customer trip search, filters, and booking flow (Phase 3 core)
+- Trip planner (rule-based itinerary assembly)
+- Stripe payment integration
+- Email notifications (Brevo)
+- SMS notifications (Twilio)
+- Meilisearch full-text search
+- Map view for providers (Mapbox GL)
+- Google OAuth
+- Real-time booking updates (SSE)
+- GitHub Actions CI/CD pipeline
 
 LLM/AI integration is explicitly out of scope for now. Do not add AI SDK dependencies, do not wire Claude API, do not stub AI endpoints. The trip planner is deterministic for the foreseeable future.
 
@@ -434,6 +525,10 @@ chore: update prisma client after schema migration
 - **Docker image builds happen in GitHub Actions, not on the Droplet.** Never run `docker build` on the Droplet — it will OOM on 2 GB RAM.
 - **Caddy handles TLS automatically.** Do not configure Let's Encrypt manually. Caddy obtains and renews certificates on first request. Ensure ports 80 and 443 are open in the Droplet firewall.
 - **Postgres data lives in a Docker volume (`postgres_data`).** Destroying the volume destroys all data. Never run `docker compose down -v` in production.
+- **`packages/db` Prisma singleton is lazy.** `packages/db/src/index.ts` uses a `Proxy` to defer `PrismaClient` creation until the first query. This avoids a timing issue in Next.js dev where the module is evaluated before `.env.local` env vars are loaded into `process.env`. If you see `PrismaClientInitializationError: Environment variable not found: DATABASE_URL` in dev, restart the dev servers (`pnpm dev`). Never remove the Proxy pattern — reverting to eager init will re-introduce the bug.
+- **Each Next.js app must have its own `.env.local`.** Next.js only reads `.env.local` from the app directory (where `next.config.js` lives). The root `.env.local` is not inherited by portal apps. Every app needs at minimum `NEXTAUTH_SECRET`, `DATABASE_URL`, and `NEXTAUTH_URL` pointing to its own port.
+- **Provider onboarding requires employee verification.** A newly registered provider lands at `/profile/setup`, submits the wizard, and is set to `verification_status: PENDING`. They see an "under review" screen on the dashboard. An employee (at `/providers`) must APPROVE before the provider gains access to the listing dashboard. If REJECTED, the provider sees the reviewer note and a resubmit button.
+- **Admin role management.** The default role for new sign-ups is `CUSTOMER`. Admins change roles via the inline dropdown on `/users`. The API route `PATCH /api/users/[id]` accepts `{ role }` and validates the caller is ADMIN.
 
 ---
 

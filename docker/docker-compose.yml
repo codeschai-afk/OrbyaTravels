@@ -8,6 +8,8 @@ services:
     ports:
       - '3000:3000'
     env_file: ../.env.local
+    environment:
+      NEXTAUTH_URL: http://localhost:3000
     depends_on:
       - api
 
@@ -18,6 +20,8 @@ services:
     ports:
       - '3001:3001'
     env_file: ../.env.local
+    environment:
+      NEXTAUTH_URL: http://localhost:3001
     depends_on:
       - api
 
@@ -28,6 +32,8 @@ services:
     ports:
       - '3002:3002'
     env_file: ../.env.local
+    environment:
+      NEXTAUTH_URL: http://localhost:3002
     depends_on:
       - api
 
@@ -38,6 +44,8 @@ services:
     ports:
       - '3003:3003'
     env_file: ../.env.local
+    environment:
+      NEXTAUTH_URL: http://localhost:3003
     depends_on:
       - api
 
@@ -48,9 +56,17 @@ services:
     ports:
       - '4000:4000'
     env_file: ../.env.local
+    environment:
+      DATABASE_URL: postgresql://orbya:password@postgres:5432/orbya
+      REDIS_URL: redis://redis:6379
+      MEILISEARCH_HOST: http://meilisearch:7700
     depends_on:
-      - redis
-      - meilisearch
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      meilisearch:
+        condition: service_started
 
   postgres:
     image: postgres:16-alpine

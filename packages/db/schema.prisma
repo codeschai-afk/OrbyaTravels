@@ -23,6 +23,18 @@ enum UserRole {
   ADMIN
 }
 
+enum BusinessType {
+  PERSONAL
+  VAT_REGISTERED
+  PAN_REGISTERED
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum ListingType {
   ACCOMMODATION
   FLIGHT
@@ -164,23 +176,49 @@ model CustomerProfile {
 }
 
 model ProviderProfile {
-  id                String   @id @default(cuid())
-  user_id           String   @unique
-  business_name     String
-  description       String?  @db.Text
-  contact_email     String
-  contact_phone     String?
-  website           String?
-  logo_url          String?
-  stripe_account_id String?  @unique
-  is_verified       Boolean  @default(false)
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  id                  String             @id @default(cuid())
+  user_id             String             @unique
+  business_name       String
+  description         String?            @db.Text
+  contact_email       String
+  contact_phone       String?
+  website             String?
+  logo_url            String?
+  stripe_account_id   String?            @unique
+  is_verified         Boolean            @default(false)
+  // New provider onboarding fields
+  service_types       String[]
+  business_type       BusinessType       @default(PERSONAL)
+  registration_number String?
+  city                String?
+  area                String?
+  zip_code            String?
+  latitude            Decimal?           @db.Decimal(10, 7)
+  longitude           Decimal?           @db.Decimal(10, 7)
+  verification_status VerificationStatus @default(PENDING)
+  verification_note   String?            @db.Text
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
 
-  user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
   listings Listing[]
+  photos   ProviderImage[]
 
   @@map("provider_profiles")
+}
+
+model ProviderImage {
+  id            String  @id @default(cuid())
+  provider_id   String
+  url           String
+  cloudinary_id String?
+  alt_text      String?
+  sort_order    Int     @default(0)
+
+  provider ProviderProfile @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+
+  @@index([provider_id])
+  @@map("provider_images")
 }
 
 // ─────────────────────────────────────────────
