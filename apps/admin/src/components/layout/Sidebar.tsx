@@ -4,13 +4,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
-  Globe, Users, MapPin, Building2, BarChart3, LogOut, LayoutDashboard, ListChecks,
+  Globe, Users, MapPin, Building2, BarChart3, LogOut, LayoutDashboard, ListChecks, CalendarDays,
 } from 'lucide-react'
 
 const NAV = [
   { href: '/',           label: 'Dashboard',  icon: LayoutDashboard },
   { href: '/countries',  label: 'Countries',  icon: MapPin },
   { href: '/listings',   label: 'Listings',   icon: ListChecks },
+  { href: '/bookings',   label: 'Bookings',   icon: CalendarDays },
   { href: '/providers',  label: 'Providers',  icon: Building2 },
   { href: '/users',      label: 'Users',      icon: Users },
   { href: '/revenue',    label: 'Revenue',    icon: BarChart3 },

@@ -18,6 +18,10 @@ function fmt(price: unknown) {
   return Number(price).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
 }
 
+function fmtStatus(s: string) {
+  return s.split('_').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')
+}
+
 export default async function BookingsPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/auth/signin?callbackUrl=/bookings')
@@ -67,7 +71,7 @@ export default async function BookingsPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_STYLE[booking.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {booking.status.charAt(0) + booking.status.slice(1).toLowerCase()}
+                      {fmtStatus(booking.status)}
                     </span>
                     <p className="text-sm font-bold text-gray-900 mt-1">{fmt(booking.total_amount)}</p>
                   </div>

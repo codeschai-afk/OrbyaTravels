@@ -7,17 +7,19 @@ export default async function AdminDashboard() {
   const session = await auth()
   if (!session || session.user.role !== 'ADMIN') redirect('/auth/signin')
 
-  const [countries, providers, users, listings] = await Promise.all([
+  const [countries, providers, users, listings, bookings] = await Promise.all([
     prisma.country.count(),
     prisma.providerProfile.count(),
     prisma.user.count({ where: { role: 'CUSTOMER' } }),
     prisma.listing.count({ where: { approval_status: 'PENDING' } }),
+    prisma.booking.count({ where: { status: { in: ['CONFIRMED', 'IN_PROGRESS'] } } }),
   ])
 
   const stats = [
     { label: 'Countries',        value: countries, icon: Globe,     color: 'bg-blue-50 text-blue-600' },
     { label: 'Providers',        value: providers, icon: Building2, color: 'bg-emerald-50 text-emerald-600' },
     { label: 'Customers',        value: users,     icon: Users,     color: 'bg-purple-50 text-purple-600' },
+    { label: 'Active bookings',  value: bookings,  icon: BookOpen,  color: 'bg-brand-50 text-brand-600' },
     { label: 'Pending listings', value: listings,  icon: BookOpen,  color: 'bg-orange-50 text-orange-600' },
   ]
 
@@ -28,7 +30,7 @@ export default async function AdminDashboard() {
         <p className="text-gray-500 text-sm mt-1">Welcome back, {session.user.name}</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-10">
         {stats.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white rounded-2xl border border-gray-100 p-6">
             <div className={`inline-flex p-2.5 rounded-xl ${color} mb-4`}>

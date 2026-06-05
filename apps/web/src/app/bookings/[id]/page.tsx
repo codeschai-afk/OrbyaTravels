@@ -3,15 +3,20 @@ import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@orbyatravel/db'
 import Link from 'next/link'
 import { ArrowLeft, MapPin, Package, Clock, CalendarDays } from 'lucide-react'
+import { CancelBooking } from './CancelBooking'
 
 const STATUS_STYLE: Record<string, string> = {
-  DRAFT:           'bg-gray-100 text-gray-600',
+  DRAFT:           'bg-gray-100 text-gray-500',
   PENDING_PAYMENT: 'bg-yellow-100 text-yellow-700',
   CONFIRMED:       'bg-blue-100 text-blue-700',
   IN_PROGRESS:     'bg-purple-100 text-purple-700',
   COMPLETED:       'bg-emerald-100 text-emerald-700',
   CANCELLED:       'bg-red-100 text-red-600',
   REFUNDED:        'bg-gray-100 text-gray-500',
+}
+
+function fmtStatus(s: string) {
+  return s.split('_').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')
 }
 
 function fmt(price: unknown) {
@@ -38,7 +43,7 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
   if (!booking) notFound()
 
   const createdAt = new Date(booking.created_at).toLocaleDateString('en-US', {
-    month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    month: 'long', day: 'numeric', year: 'numeric',
   })
 
   return (
@@ -51,7 +56,7 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Booking #{booking.id.slice(-8).toUpperCase()}</h1>
           <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${STATUS_STYLE[booking.status] ?? 'bg-gray-100 text-gray-600'}`}>
-            {booking.status.charAt(0) + booking.status.slice(1).toLowerCase()}
+            {fmtStatus(booking.status)}
           </span>
         </div>
 
@@ -66,7 +71,6 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
               </Link>
             </div>
           </div>
-
           <div className="flex items-center gap-3 px-6 py-4">
             <CalendarDays className="w-5 h-5 text-gray-400" />
             <div>
@@ -74,7 +78,6 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
               <p className="font-medium text-gray-900 text-sm">{createdAt}</p>
             </div>
           </div>
-
           <div className="flex items-center justify-between px-6 py-4">
             <span className="text-sm text-gray-600">Total</span>
             <span className="text-xl font-bold text-gray-900">{fmt(booking.total_amount)}</span>
@@ -94,23 +97,25 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
                       className="text-sm font-medium text-gray-900 hover:text-brand-600 truncate block">
                       {item.listing.title}
                     </Link>
-                    <p className="text-xs text-gray-400 mt-0.5">{item.listing.type.replace('_', ' ')}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{fmtStatus(item.listing.type)}</p>
                     {item.check_in_date && item.check_out_date && (
                       <p className="text-xs text-gray-500 mt-1">
-                        {new Date(item.check_in_date).toLocaleDateString()} → {new Date(item.check_out_date).toLocaleDateString()}
+                        {new Date(item.check_in_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} →{' '}
+                        {new Date(item.check_out_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         {item.room_type && <span> · {item.room_type.name}</span>}
                         {item.quantity > 1 && <span> · {item.quantity} guests</span>}
                       </p>
                     )}
                     {item.pickup_date && item.return_date && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Pickup: {new Date(item.pickup_date).toLocaleDateString()} · Return: {new Date(item.return_date).toLocaleDateString()}
+                        {new Date(item.pickup_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} →{' '}
+                        {new Date(item.return_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
                     )}
                     {item.passenger_count && (
                       <p className="text-xs text-gray-500 mt-1">
                         {item.passenger_count} passenger{item.passenger_count !== 1 ? 's' : ''}
-                        {item.seat_class && <span> · {item.seat_class}</span>}
+                        {item.seat_class && <span> · {fmtStatus(item.seat_class)}</span>}
                       </p>
                     )}
                   </div>
@@ -121,17 +126,17 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
           </div>
         )}
 
-        {/* Status timeline */}
+        {/* Status history */}
         {booking.status_history.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
             <h2 className="font-semibold text-gray-900 mb-4">Status history</h2>
             <div className="space-y-3">
-              {booking.status_history.map((event, i) => (
+              {booking.status_history.map((event) => (
                 <div key={event.id} className="flex items-start gap-3">
-                  <div className="mt-1 w-2 h-2 rounded-full bg-brand-400 shrink-0 ring-4 ring-brand-50" />
+                  <div className="mt-1.5 w-2 h-2 rounded-full bg-brand-400 shrink-0 ring-4 ring-brand-50" />
                   <div>
                     <p className="text-sm font-medium text-gray-800">
-                      {event.from_status ? `${event.from_status} → ` : ''}{event.to_status}
+                      {event.from_status ? `${fmtStatus(event.from_status)} → ` : ''}{fmtStatus(event.to_status)}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
@@ -142,6 +147,13 @@ export default async function BookingDetailPage({ params }: { params: { id: stri
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Cancel action */}
+        {booking.status === 'CONFIRMED' && (
+          <div className="flex justify-center mt-2">
+            <CancelBooking bookingId={booking.id} />
           </div>
         )}
       </div>
