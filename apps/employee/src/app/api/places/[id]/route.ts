@@ -8,7 +8,9 @@ const schema = z.object({
   name:        z.string().min(2).optional(),
   slug:        z.string().min(2).optional(),
   description: z.string().optional(),
-  category:    z.string().optional(),
+  category:       z.string().optional(),
+  tags:           z.array(z.string()).optional(),
+  pin_importance: z.enum(['MAJOR', 'MEDIUM', 'MINOR']).optional(),
   city:        z.string().optional(),
   address:     z.string().optional(),
   latitude:    z.number().optional(),
@@ -24,13 +26,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = schema.safeParse(await req.json())
   if (!body.success) return NextResponse.json({ error: body.error.flatten() }, { status: 400 })
 
-  const { images, category, ...rest } = body.data
+  const { images, category, tags, pin_importance, ...rest } = body.data
 
   const place = await prisma.place.update({
     where: { id: params.id },
     data: {
       ...rest,
       ...(category ? { category: category as any } : {}),
+      ...(tags !== undefined ? { tags } : {}),
+      ...(pin_importance !== undefined ? { pin_importance: pin_importance as any } : {}),
       ...(images !== undefined ? {
         images: {
           deleteMany: {},

@@ -1,13 +1,6 @@
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
-import { v2 as cloudinary } from 'cloudinary'
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure:     true,
-})
+import { uploadImage } from '@/lib/storage'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -20,14 +13,8 @@ export async function POST(req: NextRequest) {
   if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: 'Max 10MB' }, { status: 400 })
   if (!file.type.startsWith('image/'))  return NextResponse.json({ error: 'Images only' }, { status: 400 })
 
-  const bytes  = await file.arrayBuffer()
-  const buffer = Buffer.from(bytes)
-  const dataUri = `data:${file.type};base64,${buffer.toString('base64')}`
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const url    = await uploadImage(buffer, file.type, 'places')
 
-  const result = await cloudinary.uploader.upload(dataUri, {
-    folder: 'orbyatravel/places',
-    transformation: [{ quality: 'auto', fetch_format: 'auto', width: 1400, crop: 'limit' }],
-  })
-
-  return NextResponse.json({ url: result.secure_url, public_id: result.public_id })
+  return NextResponse.json({ url, public_id: url })
 }

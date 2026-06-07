@@ -1,24 +1,22 @@
 # CLAUDE.md — Orbya Travel Platform
 
 > Claude Code context file. Read this before touching any file in this repo.
-> Last updated: 2026-06-05
+> Last updated: 2026-06-07
 
 ---
 
 ## What This Project Is
 
-A full-stack travel agency platform. Four distinct portals, one API, one monorepo.
+A full-stack travel agency platform. Four distinct portals, one monorepo.
 
-Customers plan and book trips end-to-end. Service providers (hotels, car rentals, airlines, bus/train operators) list their offerings. Employees moderate listings. Admins control everything.
+Customers discover destinations on a satellite map, save places, get AI-generated itineraries, and book from verified local providers. Service providers list hotels, transport, and rentals. Employees curate places and moderate listings. Admins control everything.
 
 ```
 orbyatravel.com              Customer portal
 provider.orbyatravel.com     Service provider portal
 staff.orbyatravel.com        Employee portal  [Cloudflare Zero Trust]
 admin.orbyatravel.com        Admin portal     [Cloudflare Zero Trust]
-api.orbyatravel.com          Hono backend
-status.orbyatravel.com       Uptime / status page
-docs.orbyatravel.com         API + developer docs
+storage.orbyatravel.com      MinIO object storage (images)
 ```
 
 ---
@@ -32,519 +30,347 @@ orbyatravel/
 │   ├── provider/     Next.js 14 — Service provider portal
 │   ├── employee/     Next.js 14 — Employee portal
 │   ├── admin/        Next.js 14 — Admin portal
-│   └── api/          Hono — Backend API
+│   └── api/          (Hono backend — scaffolded, mostly unused; portals query DB directly)
 │
 ├── packages/
 │   ├── ui/           Shared component library (shadcn/ui base)
-│   ├── types/        Shared TypeScript types across all apps
 │   ├── db/           Prisma schema + generated client
 │   └── config/       Shared ESLint, Tailwind, TypeScript configs
 │
 ├── docker/
-│   ├── web.Dockerfile
-│   ├── provider.Dockerfile
-│   ├── employee.Dockerfile
-│   ├── admin.Dockerfile
-│   ├── api.Dockerfile
 │   ├── Caddyfile                  Reverse proxy + automatic HTTPS
 │   ├── docker-compose.yml         Local dev
 │   └── docker-compose.prod.yml    Production (DigitalOcean Droplet)
 │
-├── .github/
-│   └── workflows/    CI/CD — GitHub Actions → GHCR → Droplet SSH deploy
-│
-└── infra/            DigitalOcean provisioning notes
+└── .github/
+    └── workflows/    CI/CD — GitHub Actions → GHCR → Droplet SSH deploy
 ```
 
-**Build tool:** Turborepo. Run `turbo dev` from root to start all apps.
+**Build tool:** Turborepo (`pnpm dev` from root starts all apps).
 
 ---
 
 ## Tech Stack
 
-### Frontend (all four portals)
+### Frontend (all portals)
 - Next.js 14, App Router, TypeScript, `output: 'standalone'` (required for Docker)
-- Tailwind CSS + shadcn/ui
-- Zustand (client state), TanStack Query (server state)
+- Tailwind CSS
 - React Hook Form + Zod (forms + validation)
-- Mapbox GL JS (maps)
-- Framer Motion (animations)
+- **MapLibre GL** — open-source map rendering (replaced Mapbox/Leaflet)
+- **ESRI World Imagery** — free satellite tiles, no API key required
+  - Tile URL: `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`
+  - Label overlay: `https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`
 
-### Backend (apps/api)
-- Hono on Node.js, TypeScript
-- Prisma ORM
-- PostgreSQL 16 — self-hosted in Docker on the same Droplet
-- Redis 7 for caching
-- BullMQ on Redis for background job queues
-- Meilisearch for full-text search
-- Cloudinary for file/image storage and CDN
+### Database
+- **PostgreSQL 16** — self-hosted in Docker
+- **Prisma ORM** — schema at `packages/db/schema.prisma`, client at `packages/db/generated/client`
+- Never run `prisma migrate dev` (requires TTY). Instead: write SQL manually in `packages/db/migrations/<timestamp>_<name>/migration.sql` then run `prisma migrate deploy`
+
+### Storage
+- **MinIO** — self-hosted S3-compatible object storage (replaced Cloudinary)
+- Bucket: `orbya-images`, public read
+- Public URL: `https://storage.orbyatravel.com` (production), `http://localhost:9000` (dev)
+- Upload via `@aws-sdk/client-s3` with `forcePathStyle: true`
+- Images processed with **sharp** before upload: resize to 1400px max width, convert to WebP quality 82
+- Storage helper at `apps/employee/src/lib/storage.ts` and `apps/provider/src/lib/storage.ts`
+- MinIO console at port 9001 (local) or `storage-admin.orbyatravel.com` (prod)
+
+### AI / Trip Planner
+- **Groq** (`groq-sdk`) with model `llama-3.3-70b-versatile`
+- Route: `apps/web/src/app/api/trip-plan/route.ts`
+- **RAG pattern**: fetches all approved provider listings for the country and injects as knowledge base into the prompt. AI is instructed to use EXACT listing titles for ACCOMMODATION and TRANSPORT legs. After generation, titles are matched back to real listing IDs in post-processing.
+- Customers select duration + travel style → AI generates day-by-day plan → customer can swap legs with real provider listings via the ItineraryEditor
 
 ### Auth
-- Auth.js (NextAuth v5) — email/password + Google OAuth
-- RBAC middleware — roles: customer, provider, employee, admin
-- Cloudflare Zero Trust — gates staff + admin portals entirely
+- **NextAuth v5 (Auth.js)** — email/password, JWT sessions
+- RBAC: `CUSTOMER | PROVIDER | EMPLOYEE | ADMIN`
+- Each portal has its own `apps/<app>/src/lib/auth.ts` and `apps/<app>/src/app/api/auth/[...nextauth]/route.ts`
 
 ### Payments
-- Stripe — customer payments
-- Stripe Connect — provider payouts
-- Stripe Billing — invoicing
+- Stripe (customer payments + provider Connect payouts) — wired but not fully tested
 
 ### Notifications
-- Brevo (SMTP + transactional email API)
-- Twilio — SMS
-- Live booking updates — Server-Sent Events via Hono (planned, Phase 3)
-
-### Trip Planner (no LLM for now)
-- Rule-based itinerary builder — customer selects destination, dates, traveler count
-- System queries available listings and assembles a structured trip object
-- Customer picks from returned options, adjusts, confirms
-- No AI/LLM involved until explicitly added later
-- The trip planner UI is conversational in feel but driven by deterministic search + filter logic
+- Brevo (SMTP + transactional email)
 
 ---
 
-## Database — Self-Hosted PostgreSQL
+## Database Schema — Key Models
 
-PostgreSQL 16 runs as a Docker container on the same DigitalOcean Droplet. No Supabase, no PgBouncer, no managed service.
-
-```
-DATABASE_URL    postgresql://orbya:<password>@postgres:5432/orbya
-```
-
-- `DATABASE_URL` is the same URL for both queries and migrations — no split needed
-- Prisma schema lives in `packages/db/schema.prisma`
-- Run migrations with: `prisma migrate deploy` (runs in a one-shot init container on deploy)
-- Data is persisted in a named Docker volume: `postgres_data`
-- Backups: daily `pg_dump` to a local file (see `docker/docker-compose.prod.yml`)
-
-**No RLS.** Data isolation between portals is enforced at the application layer via RBAC middleware in the API. The API is the only process that touches the database — portals never connect to Postgres directly.
-
----
-
-## Core Domain Concepts
-
-### User Roles
-```
-customer     Books trips, manages profile and bookings
-provider     Lists services, manages inventory and payouts
-employee     Reviews and moderates listings, handles disputes
-admin        Full platform control, user management, feature flags
-```
-
-### Listing Types
-```
-accommodation    Hotels, hostels, guesthouses
-flight           Air travel legs
-bus              Bus routes and operators
-train            Train routes
-car_rental       Vehicle rentals
-```
-
-### Booking States
-```
-draft → pending_payment → confirmed → in_progress → completed
-                       ↘ cancelled
-                       ↘ refunded
-```
-
-### Listing Approval States
-```
-pending → approved
-        ↘ rejected  (with reason stored)
-        ↘ flagged   (violation, under review)
-```
-
----
-
-## Country & Destination System
-
-Admin controls the list of available destination countries. Customers cannot book anything without selecting a destination first.
-
-### Admin can:
-- Add a country: name, ISO code, slug, description, travel advisory level
-- Upload multiple hero images per country (stored on Cloudinary, served via CDN)
-- Toggle active/inactive — inactive countries are hidden from customer search entirely
-- Set a featured flag — featured countries appear on the homepage carousel
-
-### Customer sees:
-- Visual country cards (hero image + name) on the trip planner entry screen
-- Search and listings are scoped to the selected country
-- Cannot proceed to booking without a destination country selected
-
-### Schema (in packages/db/schema.prisma):
-```
-model Country {
-  id               String          @id @default(cuid())
-  name             String
-  iso_code         String          @unique
-  slug             String          @unique
-  description      String?
-  travel_advisory  AdvisoryLevel   @default(NONE)
-  is_active        Boolean         @default(false)
-  is_featured      Boolean         @default(false)
-  hero_images      CountryImage[]
-  listings         Listing[]
-  created_at       DateTime        @default(now())
-  updated_at       DateTime        @updatedAt
+### Place
+Employee-curated attractions pinned on the map.
+```prisma
+model Place {
+  id             String        @id @default(cuid())
+  country_id     String
+  curated_by     String        -- User ID of the employee who added it
+  name           String
+  slug           String
+  description    String?
+  category       PlaceCategory @default(OTHER)
+  tags           String[]      -- descriptive labels (Family-friendly, UNESCO, Hiking, etc.)
+  pin_importance PinImportance @default(MAJOR)  -- controls map zoom visibility
+  city           String?
+  address        String?
+  latitude       Decimal       @db.Decimal(10, 7)
+  longitude      Decimal       @db.Decimal(10, 7)
+  is_active      Boolean       @default(true)
+  images         PlaceImage[]
+  ...
 }
 
-model CountryImage {
-  id          String   @id @default(cuid())
-  country_id  String
-  url         String   -- Cloudinary URL
-  alt_text    String?
-  sort_order  Int      @default(0)
-  country     Country  @relation(fields: [country_id], references: [id])
-}
-
-enum AdvisoryLevel {
-  NONE
-  LOW
-  MEDIUM
-  HIGH
-}
+enum PinImportance { MAJOR MEDIUM MINOR }
+-- MAJOR: always visible on map
+-- MEDIUM: visible at zoom >= 8 (city level)
+-- MINOR: visible at zoom >= 10.5 (street level)
 ```
 
-Country images upload through the API's file upload endpoint. Admin uploads → API validates → uploads to Cloudinary → stores URL in CountryImage table.
+### ProviderProfile
+Providers have city, zip_code, latitude, longitude for geo-correlation with places.
+
+### Country
+Countries have `hero_images` (ESRI satellite thumbnails uploaded via the admin), `places`, `listings`.
 
 ---
 
-## Deployment — DigitalOcean Droplet
+## Map System (`/plan/[slug]`)
 
-All services run as Docker containers on a single DigitalOcean Droplet. Caddy handles reverse proxying and automatic HTTPS via Let's Encrypt.
+The customer-facing country page is a full-screen satellite map experience.
+
+**Key files:**
+- `apps/web/src/app/plan/[slug]/page.tsx` — server component, fetches places + providers
+- `apps/web/src/app/plan/[slug]/PlanClient.tsx` — client wrapper with bucket list + plan builder state
+- `apps/web/src/app/plan/[slug]/CountryMap.tsx` — MapLibre GL map component
+
+**How it works:**
+1. `page.tsx` fetches active places (all images + pin_importance), approved providers with listings in the country
+2. `CountryMap` renders ESRI satellite tiles, plots pins as DOM markers
+3. Pins use `pin_importance` + current zoom to toggle `display: none` — no re-render needed
+4. Country bounds from `apps/web/public/maps/bounds.json` restrict max pan/zoom
+5. Clicking a pin slides in a detail card (photo gallery, description, nearby providers by city)
+6. "Plan my trip" button opens the AI plan builder panel
+
+**Plan builder panel (`PlanClient.tsx`):**
+- `bucket: Set<string>` — IDs in bucket list
+- `orderedBucket: string[]` — same IDs but user-ordered. Kept in sync with bucket on toggle.
+- `dayHints: Record<string, number | null>` — per-place preferred day number
+- User can reorder places with ↑↓ arrows and assign preferred days in the panel
+- `handleGenerate` sends `bucket_list: orderedBucket` + `day_hints` (nulls stripped) to the API
+
+**GeoJSON data:** Country outlines in `apps/web/public/geodata/` (from `johan/world.geo.json`).
+**Bounds data:** `apps/web/public/maps/bounds.json` — bounding boxes for all 10 countries.
+**Map script:** `apps/web/scripts/generate-maps.js` regenerates bounds.json from geodata.
+
+**Important:** ESRI tiles are loaded directly by the browser from ESRI CDN — no proxy needed, no API key.
+
+---
+
+## Employee Portal — Places Management
+
+Employees add/edit attractions. The PlaceForm (`apps/employee/src/app/places/PlaceForm.tsx`) supports:
+- **Category** (sets pin icon on map): BEACH, TEMPLE, MUSEUM, MARKET, PARK, MOUNTAIN, CITY, VILLAGE, RESTAURANT, NIGHTLIFE, ADVENTURE, HISTORICAL, OTHER
+- **Pin importance**: MAJOR / MEDIUM / MINOR (radio cards in the form)
+- **Tags**: preset chips (Family-friendly, Budget, UNESCO, etc.) + custom tag input
+- **Coordinate parsing**: accepts decimal `27.7172, 85.3240`, DMS `27°43'1.92"N`, Google Maps URL `@lat,lng,zoom`
+- **Photos**: multi-upload → `/api/upload` → MinIO (sharp resize → WebP)
+- Mini OSM iframe preview shown when valid coordinates are entered
+
+---
+
+## Provider Portal
+
+**Onboarding wizard** at `/profile/setup` (multi-step):
+1. Service types selection
+2. Business info (name, description, email, phone, website)
+3. Business type (PERSONAL / VAT_REGISTERED / PAN_REGISTERED) + registration number
+4. Location (city, area, zip code, coordinates)
+5. Photo upload (2–7 photos → MinIO)
+
+**Status flow:** PENDING → employee reviews at `/providers` → APPROVED or REJECTED with note
+
+**Listings:** Full CRUD for Hotels, Car Rentals, Buses, Flights, Trains.
+- All go through `/api/listings` which creates both the Listing record and the type-specific detail record in a transaction.
+- New listings default to `approval_status: PENDING` (employee must approve).
+- **CarForm bug fix:** `base_price` is set server-side from `price_per_day` — do not add a separate base_price input to the car rental form.
+
+---
+
+## Admin Portal
+
+**Providers page** (`/providers`): list of all providers with status badge. Clicking a provider name goes to `/providers/[id]` — full detail page showing photos (with lightbox), listings, contact info, approve/reject buttons.
+
+**Other pages:** Users (role management), Listings (approval queue), Countries (destination management), Revenue.
+
+---
+
+## AI Trip Planner — RAG Architecture
+
+`apps/web/src/app/api/trip-plan/route.ts`
+
+**Input:** `{ country_id, bucket_list: string[], day_hints?: Record<string, number>, duration_days, travel_style }`
+- `bucket_list`: **ordered** array of place IDs (user-sorted in the plan panel — first = highest priority)
+- `day_hints`: optional map of `place_id → preferred day number` (1-indexed)
+
+**Style-specific provider filtering (CRITICAL):**
+- LUXURY: only inject CAR_RENTAL listings as transport. Prompt mandates car rental for EVERY transport leg.
+- BUDGET: only inject BUS/TRAIN listings as transport. Prompt explicitly says "NEVER suggest car rentals".
+- COMFORT: inject all transport types.
+- Accommodation injected for all styles.
+
+**Context injected into Groq prompt:**
+1. User's ordered bucket list places (with day hints if set)
+2. All active places for the country
+3. Style-filtered provider listings (stays + style-appropriate transport)
+
+**Post-processing:** After AI responds, ACCOMMODATION and TRANSPORT legs are matched by title (case-insensitive) against the real listing catalog. Matched legs get `listing_id` set so the ItineraryEditor can show the "Provider booked" badge and price.
+
+**Itinerary Editor** (`apps/web/src/app/plan/[slug]/itinerary/[planId]/ItineraryEditor.tsx`):
+- Two-column layout (`xl:grid-cols-[1fr_296px]`): left = day timeline, right = provider sidebar
+- Provider sidebar (`ProviderSidebar`) shows style-filtered listings: LUXURY shows cars first, BUDGET shows buses/trains first
+- LUXURY transport legs show "Book car rental" button (purple) instead of generic "Book provider"
+- LUXURY transport legs without a booking show a prompt nudge in view mode
+- Swap modal: LUXURY sorts CAR_RENTAL listings first; BUDGET sorts BUS/TRAIN first
+- Save changes via `PATCH /api/trip-plan/[id]`
+
+---
+
+## Container Layout (Docker)
 
 ```
-Droplet spec:   $18/mo — Premium AMD, 2 vCPU, 2 GB RAM, 60 GB SSD, 3 TB transfer
-OS:             Ubuntu 24.04 LTS
-Docker:         docker.io + docker-compose-plugin
-Image registry: GitHub Container Registry (GHCR) — ghcr.io/orbyatravel/<app>
-Compose file:   /opt/orbya/docker/docker-compose.prod.yml
-Env vars:       /opt/orbya/.env.prod  (never committed — lives on Droplet only)
+caddy           443/80     routes by hostname
+web             3000       orbyatravel.com
+provider        3001       provider.orbyatravel.com
+employee        3002       staff.orbyatravel.com
+admin           3003       admin.orbyatravel.com
+postgres        5432       internal
+redis           6379       internal
+minio           9000       internal (storage.orbyatravel.com via Caddy)
+minio console   9001       internal (storage-admin.orbyatravel.com via Caddy)
 ```
 
-### Container layout on the Droplet
-```
-caddy        443/80  →  routes to app containers by hostname
-web          3000        orbyatravel.com
-provider     3001        provider.orbyatravel.com
-employee     3002        staff.orbyatravel.com
-admin        3003        admin.orbyatravel.com
-api          4000        api.orbyatravel.com
-postgres     5432        internal only
-redis        6379        internal only
-meilisearch  7700        internal only
-```
+---
 
-App containers are not exposed on public ports — all traffic enters through Caddy on 80/443.
+## Environment Variables
 
-### DNS and routing
-- Cloudflare is the DNS authority for orbyatravel.com
-- All five subdomains have A records pointing to the Droplet IP
-- Cloudflare proxy is ON — set SSL mode to **Full (strict)**
-- staff and admin subdomains are additionally gated by Cloudflare Zero Trust before reaching the Droplet
+**Root `.env.local`** (shared — symlink or copy into each app's directory):
 
-### One-time Droplet setup (manual)
 ```bash
-apt update && apt install -y docker.io docker-compose-plugin
-mkdir -p /opt/orbya/docker
-# Copy docker-compose.prod.yml and Caddyfile to /opt/orbya/docker/
-# Create /opt/orbya/.env.prod with all production secrets
-echo $GITHUB_TOKEN | docker login ghcr.io -u <github-username> --password-stdin
-cd /opt/orbya && IMAGE_TAG=<sha> docker compose -f docker/docker-compose.prod.yml up -d
+# Database
+DATABASE_URL="postgresql://orbya:password@localhost:5432/orbya"
+
+# Auth
+NEXTAUTH_SECRET="..."
+NEXTAUTH_URL="http://localhost:3000"   # per-app for each portal
+
+# MinIO (self-hosted S3)
+MINIO_ENDPOINT="http://localhost:9000"          # or http://minio:9000 in docker
+MINIO_ACCESS_KEY="minioadmin"
+MINIO_SECRET_KEY="minioadmin"
+MINIO_PUBLIC_URL="http://localhost:9000"        # https://storage.orbyatravel.com in prod
+NEXT_PUBLIC_MINIO_PUBLIC_URL="http://localhost:9000"
+MINIO_ROOT_USER="minioadmin"                    # for docker-compose MinIO service
+MINIO_ROOT_PASSWORD="minioadmin"
+
+# AI
+GROQ_API_KEY="..."
+
+# Payments (optional in dev)
+STRIPE_SECRET_KEY=""
+STRIPE_WEBHOOK_SECRET=""
+STRIPE_PUBLISHABLE_KEY=""
+
+# Email
+BREVO_API_KEY="..."
+BREVO_SMTP_KEY="..."
 ```
+
+**Production-only (on Droplet at `/opt/orbya/.env.prod`):**
+- Same vars but with real credentials
+- `MINIO_ENDPOINT=http://minio:9000` (internal docker network)
+- `MINIO_PUBLIC_URL=https://storage.orbyatravel.com`
+- `NEXTAUTH_URL` set per-app to the real domain
 
 ---
 
-## CI/CD Pipeline
+## Deployment
 
 ```
 git push origin main
         ↓
-GitHub Actions — CI job
-  lint (turbo lint) + typecheck (turbo typecheck) + tests (vitest)   ~3 min
+GitHub Actions builds 4 Docker images → pushes to GHCR
         ↓
-GitHub Actions — build-and-push job
-  builds 5 Docker images in parallel, pushes to GHCR                ~10-15 min
-  tags: ghcr.io/orbyatravel/<app>:<git-sha>
-        ↓
-GitHub Actions — deploy job
-  SSH into Droplet
-  IMAGE_TAG=<sha> docker compose -f docker/docker-compose.prod.yml pull
-  docker compose -f docker/docker-compose.prod.yml up -d --remove-orphans
-                                                                     ~2 min
-        ↓
-Live. Total time push → live: ~15-20 min
+SSH into Droplet → docker compose pull + up -d
 ```
 
-### Required GitHub Secrets
-```
-GITHUB_TOKEN      auto-provided (GHCR push)
-DO_HOST           Droplet IP address
-DO_USER           deploy user (root or orbya)
-DO_SSH_KEY        SSH private key for the deploy user
-```
+**Required GitHub Secrets:** `DO_HOST`, `DO_USER`, `DO_SSH_KEY`
 
-### Branching
-```
-main    production  →  auto-deploys to Droplet on push
-dev     staging     →  no auto-deploy (manual docker compose on a second droplet, if needed)
-feat/*  feature work
-fix/*   bug fixes
-```
-
-PRs always target `dev`. Only `dev` merges into `main` after staging sign-off.
+**Build fixes in place:**
+- All `next.config.mjs` files have `eslint: { ignoreDuringBuilds: true }` (ESLint v9 incompatibility)
+- Groq client instantiated inside POST handler body (not module level — avoids build-time crash when `GROQ_API_KEY` is undefined)
+- `sharp: true` in `pnpm-workspace.yaml` allows native sharp build
 
 ---
 
-## Environment Configuration
+## DB Migration Workflow
 
-```
-Local dev:    .env.local per app (apps/*/.env.local)
-Production:   /opt/orbya/.env.prod on the Droplet — never committed to git
-```
+1. Edit `packages/db/schema.prisma`
+2. Write SQL in `packages/db/migrations/<timestamp>_<name>/migration.sql`
+3. Apply locally: `DATABASE_URL="postgresql://orbya:password@localhost:5432/orbya" pnpm --filter @orbyatravel/db exec prisma migrate deploy`
+4. Regenerate client: `DATABASE_URL="..." pnpm --filter @orbyatravel/db exec prisma generate`
+5. **Never use `prisma migrate dev`** — it requires an interactive TTY
 
-Required vars — never hardcode any of these:
-```
-# Database (self-hosted PostgreSQL)
-DATABASE_URL               postgresql://orbya:<password>@postgres:5432/orbya
-
-# Redis
-REDIS_URL                  redis://redis:6379
-
-# Auth
-NEXTAUTH_SECRET
-NEXTAUTH_URL               must match the app's own public domain
-GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET
-
-# Payments
-STRIPE_SECRET_KEY
-STRIPE_WEBHOOK_SECRET
-STRIPE_PUBLISHABLE_KEY
-
-# Email (Brevo)
-BREVO_API_KEY
-BREVO_SMTP_KEY
-BREVO_SMTP_HOST            smtp-relay.brevo.com
-BREVO_SMTP_PORT            587
-
-# SMS
-TWILIO_ACCOUNT_SID
-TWILIO_AUTH_TOKEN
-TWILIO_PHONE_NUMBER
-
-# File storage (Cloudinary)
-CLOUDINARY_CLOUD_NAME
-CLOUDINARY_API_KEY
-CLOUDINARY_API_SECRET
-CLOUDINARY_URL             cloudinary://api_key:api_secret@cloud_name
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-
-# Maps
-MAPBOX_TOKEN
-
-# Search
-MEILISEARCH_HOST           http://meilisearch:7700
-MEILISEARCH_API_KEY
-
-# PostgreSQL container (used by docker-compose.prod.yml)
-POSTGRES_USER              orbya
-POSTGRES_PASSWORD          <strong password>
-POSTGRES_DB                orbya
-```
-
-Each Next.js app also needs `NEXTAUTH_URL` set to its own domain:
-```
-web        NEXTAUTH_URL=https://orbyatravel.com
-provider   NEXTAUTH_URL=https://provider.orbyatravel.com
-employee   NEXTAUTH_URL=https://staff.orbyatravel.com
-admin      NEXTAUTH_URL=https://admin.orbyatravel.com
-```
+**Current migrations:**
+- `20260606000000_add_place_tags` — adds `tags String[]` to Place
+- `20260607000000_add_pin_importance` — adds `PinImportance` enum + `pin_importance` column to Place
 
 ---
 
-## Security Rules
-
-Non-negotiable. Do not write code that violates these.
-
-1. No secrets in code or git history. Env vars only. Flag any hardcoded key immediately.
-2. The API is the only process that connects to PostgreSQL. Portals never get a DATABASE_URL.
-3. RBAC middleware runs on every API route. Role check happens before any business logic.
-4. staff and admin portals have no public route. Cloudflare Zero Trust blocks before the container sees the request. You still need RBAC inside the app for employee vs admin role separation.
-5. All file uploads go through the API. The API validates type and size, then uploads to Cloudinary. No direct client-to-Cloudinary uploads with server-side credentials.
-6. Stripe webhook payloads are always verified with `stripe.webhooks.constructEvent` before processing.
-7. Do not modify SPF/DKIM/DMARC DNS records without understanding what you're changing.
-8. `/opt/orbya/.env.prod` on the Droplet must be `chmod 600` and owned by the deploy user only.
-
----
-
-## Build Status
-
-```
-Phase 0   Infrastructure + accounts       [✅ complete]
-Phase 1   Database schema (ERD + Prisma)  [✅ complete]
-Phase 2   Backend API (Hono)              [🔄 in progress — routes scaffolded]
-Phase 3   Customer portal (web)           [🔄 in progress — see below]
-Phase 4   Service provider portal         [✅ core complete — see below]
-Phase 5   Employee portal                 [✅ core complete — see below]
-Phase 6   Admin portal                    [✅ core complete — see below]
-Phase 7   DevOps + CI/CD                  [🔄 in progress — Docker + DO deploy]
-Phase 8   Testing + launch                [⬜ not started]
-```
-
-### Provider Portal — What's Built
-
-**Onboarding / profile setup:**
-- Multi-step wizard at `/profile/setup` (Step 1: service types, Step 2: business info, Step 3: business type + registration number, Step 4: location, Step 5: photo upload 2–7 images via Cloudinary)
-- Schema enums: `BusinessType` (PERSONAL | VAT_REGISTERED | PAN_REGISTERED), `VerificationStatus` (PENDING | APPROVED | REJECTED)
-- `ProviderImage` model storing Cloudinary URLs per provider
-- `/api/upload` — server-side Cloudinary upload (validates type + 10MB limit), stores URL
-- `/api/profile` — GET/POST/PATCH for provider profile inc. photos
-
-**Verification flow:**
-- After signup → PENDING, shown "under review" screen
-- If REJECTED → shown rejection note + link to resubmit via setup wizard
-- If APPROVED → full dashboard with listing management
-
-**Listings:**
-- Full CRUD for Hotels, Car Rentals, Buses, Flights, Trains
-- `/api/listings` handles all 5 types in a single transaction (creates detail record)
-- Analytics page, Payouts placeholder
-
-**Auth:**
-- `/api/auth/[...nextauth]/route.ts` exists in provider app (was missing, caused 404)
-- `NEXTAUTH_SECRET` and `DATABASE_URL` required in each app's own `.env.local`
-
-### Employee Portal — What's Built
-
-- Dashboard with listing stats (pending/approved/rejected/flagged counts)
-- **Queue** — pending listings with approve/reject/flag actions
-- **Providers** — review provider applications (PENDING/APPROVED/REJECTED) with expandable detail, photos, approve button, reject modal with required note
-- **Disputes** — flagged listings table
-- `/api/listings/[id]` PATCH — EMPLOYEE role, updates `approval_status`
-- `/api/providers/[id]` PATCH — EMPLOYEE role, updates `verification_status` + `verification_note`
-
-### Admin Portal — What's Built
-
-- **Users** — table of all users with inline role selector (CUSTOMER/PROVIDER/EMPLOYEE/ADMIN), change takes effect immediately via `/api/users/[id]` PATCH
-- **Providers** — table with `verification_status` badge + `is_verified` toggle (syncs both fields)
-- **Listings** — approval management (approve/reject/flag)
-- **Countries** — destination management
-- **Revenue** — booking stats
-
-### Web Portal (Customer) — What's Built
-
-- Public browsing enabled — only `/bookings`, `/profile`, `/trips` require auth
-- Non-customer roles redirected to their own portals on sign-in
-- Countries / destinations browsable without login
-
-### Prisma Schema Additions (since initial plan)
-
-```prisma
-enum BusinessType     { PERSONAL VAT_REGISTERED PAN_REGISTERED }
-enum VerificationStatus { PENDING APPROVED REJECTED }
-
-model ProviderProfile {
-  // ... existing fields ...
-  service_types       String[]
-  business_type       BusinessType       @default(PERSONAL)
-  registration_number String?
-  city                String?
-  area                String?
-  zip_code            String?
-  latitude            Decimal?           @db.Decimal(10, 7)
-  longitude           Decimal?           @db.Decimal(10, 7)
-  verification_status VerificationStatus @default(PENDING)
-  verification_note   String?            @db.Text
-  photos              ProviderImage[]
-}
-
-model ProviderImage {
-  id            String  @id @default(cuid())
-  provider_id   String
-  url           String
-  cloudinary_id String?
-  alt_text      String?
-  sort_order    Int     @default(0)
-  provider      ProviderProfile @relation(...)
-}
-```
-
-### What's NOT Yet Built
-
-- Customer trip search, filters, and booking flow (Phase 3 core)
-- Trip planner (rule-based itinerary assembly)
-- Stripe payment integration
-- Email notifications (Brevo)
-- SMS notifications (Twilio)
-- Meilisearch full-text search
-- Map view for providers (Mapbox GL)
-- Google OAuth
-- Real-time booking updates (SSE)
-- GitHub Actions CI/CD pipeline
-
-LLM/AI integration is explicitly out of scope for now. Do not add AI SDK dependencies, do not wire Claude API, do not stub AI endpoints. The trip planner is deterministic for the foreseeable future.
-
----
-
-## Conventions
-
-### Naming
-- DB tables: `snake_case`, plural (`bookings`, `listings`, `country_images`)
-- TypeScript types/interfaces: `PascalCase`
-- API routes: `/v1/resource/:id`, RESTful
-- React components: `PascalCase`, colocated with styles
-- Env vars: `SCREAMING_SNAKE_CASE`
-
-### API response shape
-```ts
-// success
-{ data: T, meta?: PaginationMeta }
-
-// error
-{ error: { code: string, message: string, details?: unknown } }
-```
-
-### Commit style
-```
-feat: add country image upload endpoint
-fix: booking state transition guard on cancelled orders
-chore: update prisma client after schema migration
-```
-
----
-
-## Known Constraints and Gotchas
-
-- **2 GB RAM is tight.** All 8 containers together use ~1.3–1.5 GB. Do not add memory-hungry services without checking headroom first. Tune Meilisearch and PostgreSQL conservatively (`shared_buffers=128MB`, `MEILI_MAX_INDEXING_MEMORY=200mb`).
-- **BullMQ workers run inside the API container.** The Hono HTTP server and the BullMQ worker share the same Node process (started together in `apps/api/src/index.ts`). This is fine for the Droplet — no separate worker process needed.
-- **Prisma migrations run as a one-shot init container** (`migrate` service in docker-compose.prod.yml) before the api container starts. Never run `prisma migrate dev` in production.
-- **Meilisearch index is eventually consistent with Postgres.** BullMQ jobs sync on listing create/update/delete. Never use Meilisearch for anything requiring transactional accuracy.
-- **Turborepo caches builds aggressively.** If you see stale output, run `turbo clean` before investigating further.
-- **Cloudflare Zero Trust on staff/admin** means those containers never see unauthenticated traffic. You still need RBAC inside for employee vs admin role separation — Zero Trust only checks identity, not role.
-- **Docker image builds happen in GitHub Actions, not on the Droplet.** Never run `docker build` on the Droplet — it will OOM on 2 GB RAM.
-- **Caddy handles TLS automatically.** Do not configure Let's Encrypt manually. Caddy obtains and renews certificates on first request. Ensure ports 80 and 443 are open in the Droplet firewall.
-- **Postgres data lives in a Docker volume (`postgres_data`).** Destroying the volume destroys all data. Never run `docker compose down -v` in production.
-- **`packages/db` Prisma singleton is lazy.** `packages/db/src/index.ts` uses a `Proxy` to defer `PrismaClient` creation until the first query. This avoids a timing issue in Next.js dev where the module is evaluated before `.env.local` env vars are loaded into `process.env`. If you see `PrismaClientInitializationError: Environment variable not found: DATABASE_URL` in dev, restart the dev servers (`pnpm dev`). Never remove the Proxy pattern — reverting to eager init will re-introduce the bug.
-- **Each Next.js app must have its own `.env.local`.** Next.js only reads `.env.local` from the app directory (where `next.config.js` lives). The root `.env.local` is not inherited by portal apps. Every app needs at minimum `NEXTAUTH_SECRET`, `DATABASE_URL`, and `NEXTAUTH_URL` pointing to its own port.
-- **Provider onboarding requires employee verification.** A newly registered provider lands at `/profile/setup`, submits the wizard, and is set to `verification_status: PENDING`. They see an "under review" screen on the dashboard. An employee (at `/providers`) must APPROVE before the provider gains access to the listing dashboard. If REJECTED, the provider sees the reviewer note and a resubmit button.
-- **Admin role management.** The default role for new sign-ups is `CUSTOMER`. Admins change roles via the inline dropdown on `/users`. The API route `PATCH /api/users/[id]` accepts `{ role }` and validates the caller is ADMIN.
-
----
-
-## Quick Reference: Port Map (local dev)
+## Port Map (local dev)
 
 ```
 3000    apps/web        Customer portal
 3001    apps/provider   Provider portal
 3002    apps/employee   Employee portal
 3003    apps/admin      Admin portal
-4000    apps/api        Hono API
 5432    PostgreSQL
 6379    Redis
-7700    Meilisearch
+9000    MinIO API
+9001    MinIO Console
 ```
 
 ---
 
-*Keep this file updated as architecture decisions change. New service, new env var, changed convention — update CLAUDE.md in the same PR.*
+## Known Constraints & Gotchas
+
+- **`prisma migrate dev` cannot be used** in this environment (no interactive TTY). Always use `prisma migrate deploy` with manually written SQL.
+- **MinIO `forcePathStyle: true` is required** for the S3 client when using MinIO (not AWS S3).
+- **ESRI tiles are fetched by the browser directly** — no server-side tile proxy, no API key. Don't add a proxy.
+- **Each Next.js app needs its own `.env.local`** in the app directory. The root `.env.local` is not inherited.
+- **MapLibre markers use DOM elements** — they are NOT part of the map style/layers. Markers must be added after `map.on('load')` fires (use `mapLoaded` state pattern in CountryMap).
+- **Zoom-based pin visibility** is done by toggling `marker.getElement().style.display` directly — no React state update needed for performance.
+- **`packages/db` PrismaClient** uses a Proxy for lazy initialization. Never remove this pattern or you'll get `DATABASE_URL not found` in dev.
+- **2 GB RAM Droplet** — do not add memory-hungry services. Current containers use ~1.3–1.5 GB.
+- **No RLS in Postgres** — access control is at the application layer via session role checks on every API route.
+- **Provider verification** — new providers land at `verification_status: PENDING`. Employee must APPROVE at `/providers` before they can manage listings.
+- **Staff/admin portals** are gated by Cloudflare Zero Trust before the container sees the request. Still enforce RBAC inside the app.
+- **Seed credentials (local dev only):** `admin@orbyatravel.com` / `password123`, `employee@orbyatravel.com` / `password123`, `provider@orbyatravel.com` / `password123`, `customer@orbyatravel.com` / `password123`
+
+---
+
+## Current Build Status
+
+```
+Maps            ✅ MapLibre GL + ESRI satellite, zoom-based pin importance
+Storage         ✅ MinIO self-hosted, sharp resize → WebP
+Places          ✅ Employee CRUD with tags, pin importance, coord parsing, multi-photo
+AI Trip Planner ✅ Groq + RAG, style-specific providers, place reorder/day hints, provider sidebar
+Custom Plan     ✅ /plan/[slug]/custom — manual day/leg builder, picks from places + listings
+Checkout        ✅ POST /api/checkout — batch-books all provider-linked legs into one Booking
+Provider Portal ✅ Full onboarding, listings CRUD, notification dots (pending listings + new bookings)
+Employee Portal ✅ Places, provider review, listing approval, notification dots, provider detail + orders
+Admin Portal    ✅ Provider detail/approve, user management, countries
+Payments        🔄 Stripe wired, not fully tested
+Email notifs    ⬜ Brevo configured, sending not implemented
+Deployment      🔄 GitHub Actions + DO Droplet — MinIO needs prod env vars set
+```
+
+*Update this file in the same PR whenever architecture, env vars, or major features change.*

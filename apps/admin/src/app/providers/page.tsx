@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@orbyatravel/db'
 import { Building2 } from 'lucide-react'
+import Link from 'next/link'
 import { VerifyToggle } from './VerifyToggle'
 
 export default async function ProvidersPage() {
@@ -51,8 +52,10 @@ export default async function ProvidersPage() {
                 return (
                 <tr key={p.id} className="hover:bg-gray-50/50">
                   <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">{p.business_name}</div>
-                    {p.website && <div className="text-gray-400 text-xs truncate max-w-[180px]">{p.website}</div>}
+                    <Link href={`/providers/${p.id}`} className="block hover:text-blue-600 transition-colors">
+                      <div className="font-medium text-gray-900">{p.business_name}</div>
+                      {p.website && <div className="text-gray-400 text-xs truncate max-w-[180px]">{p.website}</div>}
+                    </Link>
                   </td>
                   <td className="px-4 py-4 text-gray-600 text-xs">{p.contact_email}</td>
                   <td className="px-4 py-4 text-gray-500 text-xs">{p.city ?? '—'}</td>

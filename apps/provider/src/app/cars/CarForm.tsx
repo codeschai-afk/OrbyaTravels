@@ -13,7 +13,6 @@ const schema = z.object({
   title:            z.string().min(3).max(120),
   description:      z.string().min(10),
   country_id:       z.string().min(1, 'Select a country'),
-  base_price:       z.coerce.number().positive(),
   currency:         z.string().default('USD'),
   make:             z.string().min(1, 'Required'),
   model:            z.string().min(1, 'Required'),
@@ -56,6 +55,7 @@ export function CarForm({ countries, defaultValues, listingId }: Props) {
     const { make, model, year, transmission, fuel_type, seats, price_per_day, pickup_location, dropoff_location, total_vehicles, features, ...rest } = data
     const payload = {
       ...rest,
+      base_price: price_per_day, // car rental base price = daily rate
       type: 'CAR_RENTAL',
       car_rental: { make, model, year, transmission, fuel_type, seats, price_per_day, pickup_location, dropoff_location, total_vehicles, features },
     }

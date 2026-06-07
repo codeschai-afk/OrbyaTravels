@@ -17,3 +17,13 @@ admin.orbyatravel.com {
 api.orbyatravel.com {
 	reverse_proxy api:4000
 }
+
+# MinIO — images + tiles (public read buckets)
+storage.orbyatravel.com {
+	reverse_proxy minio:9000
+}
+
+# MinIO console (restrict to your IP in production)
+storage-admin.orbyatravel.com {
+	reverse_proxy minio:9001
+}

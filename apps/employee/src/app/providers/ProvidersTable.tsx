@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, X } from 'lucide-react'
+import Link from 'next/link'
+import { CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, X, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 type Photo  = { url: string; alt_text: string | null }
@@ -146,6 +147,13 @@ function ProfileRow({ profile, onAction }: { profile: Profile; onAction: (id: st
                 </button>
               </>
             )}
+            <Link
+              href={`/providers/${profile.id}`}
+              className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
+              title="View orders & details"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Link>
             <button onClick={() => setExpanded(e => !e)} className="p-1.5 text-gray-400 hover:text-gray-600">
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>

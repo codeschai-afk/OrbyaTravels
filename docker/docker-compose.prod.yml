@@ -118,9 +118,41 @@ services:
     volumes:
       - meilisearch_data:/meili_data
 
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+        mc mb --ignore-existing local/orbya-images;
+        mc mb --ignore-existing local/orbya-tiles;
+        mc anonymous set download local/orbya-images;
+        mc anonymous set download local/orbya-tiles;
+        echo 'MinIO buckets ready.';
+      "
+    restart: "no"
+
 volumes:
   caddy_data:
   caddy_config:
   postgres_data:
   redis_data:
   meilisearch_data:
+  minio_data:

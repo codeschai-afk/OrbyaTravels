@@ -42,7 +42,6 @@ export default async function CarEditPage({ params }: { params: Promise<{ slug: 
           title:            listing.title,
           description:      listing.description,
           country_id:       listing.country_id,
-          base_price:       Number(listing.base_price),
           currency:         listing.currency,
           make:             cr?.make ?? '',
           model:            cr?.model ?? '',

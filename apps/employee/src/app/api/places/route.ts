@@ -8,7 +8,9 @@ const schema = z.object({
   name:        z.string().min(2),
   slug:        z.string().min(2),
   description: z.string().optional(),
-  category:    z.string(),
+  category:       z.string(),
+  tags:           z.array(z.string()).default([]),
+  pin_importance: z.enum(['MAJOR', 'MEDIUM', 'MINOR']).default('MAJOR'),
   city:        z.string().optional(),
   address:     z.string().optional(),
   latitude:    z.number(),
@@ -29,8 +31,10 @@ export async function POST(req: NextRequest) {
   const place = await prisma.place.create({
     data: {
       ...data,
-      category:   data.category as any,
-      curated_by: session.user.id,
+      category:       data.category as any,
+      pin_importance: data.pin_importance as any,
+      tags:           data.tags,
+      curated_by:     session.user.id,
       images: {
         create: images.map((url, i) => ({ url, sort_order: i })),
       },

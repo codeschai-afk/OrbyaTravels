@@ -108,6 +108,12 @@ enum PlaceCategory {
   OTHER
 }
 
+enum PinImportance {
+  MAJOR
+  MEDIUM
+  MINOR
+}
+
 enum TravelStyle {
   BUDGET
   COMFORT
@@ -692,8 +698,10 @@ model Place {
   name        String
   slug        String
   description String?       @db.Text
-  category    PlaceCategory @default(OTHER)
-  city        String?
+  category       PlaceCategory @default(OTHER)
+  tags           String[]
+  pin_importance PinImportance @default(MAJOR)
+  city           String?
   address     String?
   latitude    Decimal       @db.Decimal(10, 7)
   longitude   Decimal       @db.Decimal(10, 7)

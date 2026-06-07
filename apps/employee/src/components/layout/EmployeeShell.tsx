@@ -3,7 +3,13 @@
 import { usePathname } from 'next/navigation'
 import { EmployeeSidebar } from './EmployeeSidebar'
 
-export function EmployeeShell({ children }: { children: React.ReactNode }) {
+interface Props {
+  children:         React.ReactNode
+  pendingProviders: number
+  pendingListings:  number
+}
+
+export function EmployeeShell({ children, pendingProviders, pendingListings }: Props) {
   const pathname = usePathname()
   const isAuthRoute = pathname.startsWith('/auth')
 
@@ -11,7 +17,7 @@ export function EmployeeShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <EmployeeSidebar />
+      <EmployeeSidebar pendingProviders={pendingProviders} pendingListings={pendingListings} />
       <main className="flex-1 overflow-auto bg-gray-50">{children}</main>
     </div>
   )
