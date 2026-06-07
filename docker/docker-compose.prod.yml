@@ -23,7 +23,10 @@ services:
     command:
       - sh
       - -c
-      - packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/schema.prisma
+      - |
+        echo 'DELETE FROM "_prisma_migrations" WHERE finished_at IS NULL;' | \
+          packages/db/node_modules/.bin/prisma db execute --schema packages/db/schema.prisma --stdin 2>/dev/null || true
+        packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/schema.prisma
     env_file: ../.env.prod
     depends_on:
       postgres:
