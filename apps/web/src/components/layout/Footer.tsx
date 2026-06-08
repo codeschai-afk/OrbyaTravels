@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Globe } from 'lucide-react'
 
 export function Footer() {
   return (
@@ -8,9 +7,9 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-2 text-white font-bold text-lg mb-3">
-              <Globe className="w-5 h-5 text-brand-400" />
-              Orbya
+            <Link href="/" className="inline-flex items-center mb-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logos/logo.png" alt="Orbya Travel" className="h-10 w-auto" />
             </Link>
             <p className="text-sm leading-relaxed">
               Plan and book complete trips — hotels, flights, transport and more.

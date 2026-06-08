@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { Menu, X, Globe, ChevronDown, User, CalendarDays, LogOut, Loader2 } from 'lucide-react'
+import { Menu, X, ChevronDown, User, CalendarDays, LogOut, Loader2 } from 'lucide-react'
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -31,7 +31,6 @@ export function Navbar() {
   }, [dropdownOpen])
 
   const textClass = scrolled ? 'text-gray-700' : 'text-white'
-  const logoClass = scrolled ? 'text-brand-600' : 'text-white'
 
   const handleSignOut = async () => {
     await signOut({ redirect: false })
@@ -50,9 +49,13 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className={`flex items-center gap-2 font-bold text-xl ${logoClass}`}>
-            <Globe className="w-6 h-6" />
-            Orbya
+          <Link href="/" className="flex items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logos/logo.png"
+              alt="Orbya Travel"
+              className={`h-9 w-auto transition-all duration-300 ${scrolled ? 'brightness-0' : ''}`}
+            />
           </Link>
 
           {/* Desktop nav */}

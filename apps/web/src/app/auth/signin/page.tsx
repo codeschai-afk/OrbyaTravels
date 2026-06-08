@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { signIn, getSession } from 'next-auth/react'
 import { z } from 'zod'
-import { Globe, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 
 const ROLE_URLS: Record<string, string> = {
   CUSTOMER: '/plan',
@@ -49,9 +49,9 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-16">
       <div className="w-full max-w-md">
-        <Link href="/" className="flex items-center justify-center gap-2 text-brand-600 font-bold text-2xl mb-8">
-          <Globe className="w-7 h-7" />
-          Orbya
+        <Link href="/" className="flex items-center justify-center mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logos/logo.png" alt="Orbya Travel" className="h-12 w-auto brightness-0" />
         </Link>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
