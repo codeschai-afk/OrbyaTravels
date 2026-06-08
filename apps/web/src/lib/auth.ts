@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
+import Google from 'next-auth/providers/google'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import { prisma } from '@orbyatravel/db'
 import bcrypt from 'bcryptjs'
@@ -33,6 +34,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
     : undefined,
   providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Allow users who registered with email/password to also sign in with Google
+      allowDangerousEmailAccountLinking: true,
+    }),
     Credentials({
       credentials: {
         email: { label: 'Email', type: 'email' },
@@ -56,10 +63,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async signIn({ account, profile }) {
+      // Block ADMIN and EMPLOYEE from using Google OAuth — they must use credentials
+      if (account?.provider === 'google' && profile?.email) {
+        const existing = await prisma.user.findUnique({
+          where: { email: profile.email },
+          select: { role: true },
+        })
+        if (existing && ['ADMIN', 'EMPLOYEE'].includes(existing.role)) {
+          return false
+        }
+      }
+      return true
+    },
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id
-        token.role = user.role
+        // Credentials provider sets role directly; for Google it may be undefined
+        if ('role' in user) token.role = user.role
+      }
+      // Fetch role from DB on first Google sign-in (not set by OAuth provider)
+      if (account?.provider === 'google' && token.id && !token.role) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true },
+        })
+        if (dbUser) token.role = dbUser.role
       }
       return token
     },
