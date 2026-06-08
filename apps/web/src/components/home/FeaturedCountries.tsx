@@ -3,16 +3,13 @@ import { ArrowRight, Shield } from 'lucide-react'
 import { prisma } from '@orbyatravel/db'
 
 const FALLBACK_GRADIENTS: Record<string, string> = {
-  japan:    'from-rose-500 to-pink-700',
-  italy:    'from-emerald-500 to-green-700',
-  thailand: 'from-amber-400 to-orange-600',
-  france:   'from-blue-500 to-indigo-700',
-  greece:   'from-sky-400 to-blue-700',
-  morocco:  'from-orange-500 to-red-700',
+  nepal: 'from-emerald-600 to-teal-800',
+  india: 'from-orange-500 to-amber-700',
 }
 
 const FALLBACK_BADGES: Record<string, string> = {
-  japan: '🗾', italy: '🏛️', thailand: '🐘', france: '🗼', greece: '🏺', morocco: '🕌',
+  nepal: '🏔️',
+  india: '🌺',
 }
 
 const ADVISORY_LABEL: Record<string, string> = {

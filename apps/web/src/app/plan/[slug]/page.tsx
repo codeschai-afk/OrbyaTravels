@@ -4,16 +4,8 @@ import { prisma } from '@orbyatravel/db'
 import { PlanClient } from './PlanClient'
 
 const COUNTRY_CENTERS: Record<string, [number, number]> = {
-  india:     [22.5, 80.0],
-  nepal:     [28.3, 84.1],
-  japan:     [36.2, 138.2],
-  italy:     [42.8, 12.8],
-  thailand:  [13.0, 101.5],
-  france:    [46.6, 2.3],
-  greece:    [39.1, 22.4],
-  morocco:   [31.8, -7.1],
-  indonesia: [-2.5, 117.9],
-  spain:     [40.4, -3.7],
+  india: [22.5, 80.0],
+  nepal: [28.3, 84.1],
 }
 
 export default async function PlanCountryPage({ params }: { params: { slug: string } }) {

@@ -4,11 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, MapPin } from 'lucide-react'
 
-const DESTINATIONS = [
-  'Japan', 'Italy', 'France', 'Thailand',
-  'Greece', 'Morocco', 'Spain', 'Indonesia',
-  'Turkey', 'Portugal', 'India', 'Australia',
-]
+const DESTINATIONS = ['India', 'Nepal']
 
 export function Hero() {
   const [destination, setDestination] = useState('')
@@ -42,7 +38,7 @@ export function Hero() {
       <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white/90 text-sm px-4 py-1.5 rounded-full mb-6">
           <MapPin className="w-3.5 h-3.5" />
-          Explore 100+ destinations worldwide
+          Nepal &amp; India — handpicked trips
         </div>
 
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white leading-tight mb-6">
@@ -77,16 +73,16 @@ export function Hero() {
           </button>
         </div>
 
-        {/* Stats */}
-        <div className="mt-12 flex flex-wrap justify-center gap-8 text-white/80 text-sm">
+        {/* Destination pills */}
+        <div className="mt-10 flex flex-wrap justify-center gap-3 text-sm">
           {[
-            { value: '50K+', label: 'Happy travellers' },
-            { value: '100+', label: 'Destinations' },
-            { value: '10K+', label: 'Listings' },
-          ].map(({ value, label }) => (
-            <div key={label} className="text-center">
-              <div className="text-2xl font-bold text-white">{value}</div>
-              <div>{label}</div>
+            { label: '🏔️ Nepal', desc: 'Himalayas · culture · trekking' },
+            { label: '🌺 India', desc: 'heritage · wildlife · cuisine' },
+          ].map(({ label, desc }) => (
+            <div key={label} className="flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 rounded-full px-4 py-2 text-white">
+              <span className="font-semibold">{label}</span>
+              <span className="text-white/50">·</span>
+              <span className="text-white/70 text-xs">{desc}</span>
             </div>
           ))}
         </div>

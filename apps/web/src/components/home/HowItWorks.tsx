@@ -6,7 +6,7 @@ const STEPS = [
     step: '01',
     title: 'Choose your destination',
     description:
-      'Pick from 100+ destinations worldwide. Each country page shows travel advisories, best seasons, and available listings.',
+      'Currently available in Nepal and India, with more destinations coming soon. Each country page shows travel advisories, best seasons, and available listings.',
     color: 'bg-brand-50 text-brand-600',
   },
   {
